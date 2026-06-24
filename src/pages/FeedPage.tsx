@@ -118,18 +118,18 @@ export default function FeedPage() {
     }
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+    const filePath = `posts/${user.id}/${Date.now()}.${fileExt}`;
 
     setUploadingFile(true);
     try {
       const { error: uploadError } = await supabase.storage
-        .from('posts-media')
+        .from('uploads')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('posts-media')
+        .from('uploads')
         .getPublicUrl(filePath);
 
       setUploadedMediaUrl(publicUrl);

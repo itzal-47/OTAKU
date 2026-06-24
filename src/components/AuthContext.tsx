@@ -31,6 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (prof) {
       const char = await getCharacter(prof.id);
       setCharacter(char);
+    } else {
+      setCharacter(null);
     }
   };
 
@@ -38,20 +40,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      if (session?.user) {
+        (async () => {
+          const prof = await getCurrentProfile();
+          setProfile(prof);
+          if (prof) {
+            const char = await getCharacter(prof.id);
+            setCharacter(char);
+          }
+          setLoading(false);
+        })();
+      } else {
+        setLoading(false);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        const prof = await getCurrentProfile();
-        setProfile(prof);
-        if (prof) {
-          const char = await getCharacter(prof.id);
-          setCharacter(char);
-        }
+        (async () => {
+          const prof = await getCurrentProfile();
+          setProfile(prof);
+          if (prof) {
+            const char = await getCharacter(prof.id);
+            setCharacter(char);
+          } else {
+            setCharacter(null);
+          }
+        })();
       } else {
         setProfile(null);
         setCharacter(null);
@@ -61,8 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      refreshProfile();
+    }
+  }, [user?.id]);
+
   const signUp = async (email: string, password: string, username: string, characterClass: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -72,7 +96,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-    return { error };
+
+    if (error) return { error };
+
+    // If email confirmation is disabled, we get a session immediately
+    if (data.session) {
+      setSession(data.session);
+      setUser(data.session.user);
+
+      // Create profile immediately
+      (async () => {
+        try {
+          const userId = data.session!.user.id;
+          await supabase.from('profiles').insert({
+            id: userId,
+            username,
+            email,
+            is_admin: false,
+            is_super_admin: false,
+            is_event_publisher: false
+          });
+          // Create user_settings
+          await supabase.from('user_settings').insert({
+            user_id: userId,
+            theme: 'dark',
+            notifications_enabled: true,
+            email_notifications: true,
+            show_province: true,
+            show_character: true,
+            language: 'pt'
+          });
+          // Check if this is the first user -> make super admin
+          const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+          if (count === 1) {
+            await supabase.from('profiles').update({ is_super_admin: true, is_admin: true }).eq('id', userId);
+          }
+          // Create default character if not exists
+          const { data: existingChar } = await supabase.from('characters').select('*').eq('user_id', userId).maybeSingle();
+          if (!existingChar) {
+            await supabase.from('characters').insert({
+              user_id: userId,
+              name: username,
+              class: characterClass || 'ninja',
+              level: 1,
+              xp: 0,
+              hp: 100,
+              max_hp: 100,
+              attack: 10,
+              defense: 10,
+              speed: 10,
+              special: 10,
+              wins: 0,
+              losses: 0,
+              draws: 0
+            });
+          }
+          const prof = await getCurrentProfile();
+          setProfile(prof);
+        } catch (e) {
+          console.error('Error creating profile after signup:', e);
+        }
+      })();
+    }
+
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -90,12 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCharacter(null);
     setSession(null);
   };
-
-  useEffect(() => {
-    if (user) {
-      refreshProfile();
-    }
-  }, [user?.id]);
 
   const value = {
     user,

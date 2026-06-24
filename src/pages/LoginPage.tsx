@@ -88,20 +88,18 @@ export default function LoginPage() {
           throw new Error('Palavra-passe deve ter pelo menos 8 caracteres');
         }
 
-        // Update profile with province after signup
         const { error } = await signUp(email, password, username, selectedClass);
         if (error) throw error;
 
-        // Wait for profile creation then update province
-        setTimeout(async () => {
-          const currentUser = await supabase.auth.getUser();
-          if (currentUser.data.user) {
-            await supabase
-              .from('profiles')
-              .update({ province: selectedProvince, city: selectedProvince })
-              .eq('id', currentUser.data.user.id);
-          }
-        }, 2000);
+        // The signUp function in AuthContext now creates profile and user_settings
+        // Update province immediately after signup
+        const currentUser = await supabase.auth.getUser();
+        if (currentUser.data.user) {
+          await supabase
+            .from('profiles')
+            .update({ province: selectedProvince, city: selectedProvince })
+            .eq('id', currentUser.data.user.id);
+        }
 
         showToast('Conta criada! Agora cria o teu personagem.', 'success');
         navigate('/criar-personagem');

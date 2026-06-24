@@ -73,12 +73,12 @@ export default function Footer() {
             </h4>
             <ul className="flex flex-col gap-3">
               {[
-                { label: 'Fórum', path: '#' },
-                { label: 'Cosplayers', path: '#' },
-                { label: 'Watch Parties', path: '#' },
-                { label: 'Grupos de Anime', path: '#' },
+                { path: '/feed', label: 'Feed' },
+                { path: '/stories', label: 'Stories' },
+                { path: '/groups', label: 'Grupos' },
+                { path: '/messages', label: 'Mensagens' },
               ].map(({ path, label }) => (
-                <li key={label}>
+                <li key={path}>
                   <Link
                     to={path}
                     className="text-sm text-text3 hover:text-text2 transition-colors"

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap } from 'lucide-react';
+import { Menu, X, Search, Zap, MessageSquare, Users, Inbox } from 'lucide-react';
 import { useState } from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -28,6 +28,7 @@ export default function Navbar() {
         {[
           { path: '/feed', label: 'Feed' },
           { path: '/stories', label: 'Stories' },
+          { path: '/groups', label: 'Grupos' },
           { path: '/arena', label: 'Arena' },
           { path: '/rankings', label: 'Rankings' },
           { path: '/clas', label: 'Clãs' },
@@ -55,10 +56,18 @@ export default function Navbar() {
           <Search size={18} className="text-text2 hover:text-text" />
         </Link>
 
-        {user && profile ? (
+        {user ? (
           <>
+            <Link to="/messages" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors text-text2 hover:text-text" title="Mensagens">
+              <MessageSquare size={18} />
+            </Link>
             <NotificationBell />
-            {profile.is_admin && (
+            {profile?.is_super_admin && (
+              <Link to="/inbox" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors text-amber" title="Inbox Admin">
+                <Inbox size={18} />
+              </Link>
+            )}
+            {profile?.is_admin && (
               <Link to="/admin" className="btn btn-ghost text-xs py-2 px-3 text-amber">
                 Admin
               </Link>
@@ -68,9 +77,9 @@ export default function Navbar() {
             </Link>
             <Link to="/dashboard" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg3 hover:bg-bg4 transition-colors">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple to-red flex items-center justify-center text-sm font-bold">
-                {profile.username.charAt(0).toUpperCase()}
+                {profile?.username ? profile.username.charAt(0).toUpperCase() : '?'}
               </div>
-              <span className="text-sm font-medium text-text">{profile.username}</span>
+              <span className="text-sm font-medium text-text">{profile?.username || 'User'}</span>
             </Link>
             <button onClick={signOut} className="btn btn-ghost text-xs py-2 px-3">
               Sair
@@ -109,6 +118,7 @@ export default function Navbar() {
             {[
               { path: '/feed', label: '📰 Feed' },
               { path: '/stories', label: '📱 Stories' },
+              { path: '/groups', label: '👥 Grupos' },
               { path: '/arena', label: '⚔️ Arena' },
               { path: '/rankings', label: '🏆 Rankings' },
               { path: '/clas', label: '🛡️ Clãs' },
@@ -131,8 +141,15 @@ export default function Navbar() {
               </Link>
             ))}
             <div className="h-px bg-border my-2" />
-            {user && profile ? (
+            {user ? (
               <>
+                <Link
+                  to="/messages"
+                  onClick={() => setMobileOpen(false)}
+                  className="px-4 py-3 rounded-lg text-sm font-medium text-text2"
+                >
+                  💬 Mensagens
+                </Link>
                 <Link
                   to="/dashboard"
                   onClick={() => setMobileOpen(false)}
@@ -147,7 +164,16 @@ export default function Navbar() {
                 >
                   ⚙️ Configurações
                 </Link>
-                {profile.is_admin && (
+                {profile?.is_super_admin && (
+                  <Link
+                    to="/inbox"
+                    onClick={() => setMobileOpen(false)}
+                    className="px-4 py-3 rounded-lg text-sm font-medium text-amber"
+                  >
+                    📥 Inbox Admin
+                  </Link>
+                )}
+                {profile?.is_admin && (
                   <Link
                     to="/admin"
                     onClick={() => setMobileOpen(false)}

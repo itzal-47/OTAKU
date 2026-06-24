@@ -445,6 +445,114 @@ export const ANGOLAN_PROVINCES = [
 ];
 
 // ============================================
+// GROUPS
+// ============================================
+export type GroupPrivacy = 'public' | 'private' | 'secret';
+export type GroupRole = 'admin' | 'moderator' | 'member' | 'pending';
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  avatar_url: string;
+  banner_url: string;
+  privacy_type: GroupPrivacy;
+  category: string;
+  rules: string;
+  created_by: string;
+  member_count: number;
+  post_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: GroupRole;
+  joined_at: string;
+  user?: UserProfile;
+}
+
+export interface GroupPost {
+  id: string;
+  group_id: string;
+  user_id: string;
+  content: string;
+  media_type: 'none' | 'image' | 'video' | 'file';
+  media_url: string | null;
+  likes_count: number;
+  comments_count: number;
+  is_pinned: boolean;
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+  user?: UserProfile;
+}
+
+export interface GroupPostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user?: UserProfile;
+}
+
+export interface GroupPostLike {
+  id: string;
+  post_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface GroupJoinRequest {
+  id: string;
+  group_id: string;
+  user_id: string;
+  message: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  user?: UserProfile;
+}
+
+// ============================================
+// PRIVATE MESSAGING
+// ============================================
+export interface PrivateChat {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  last_message_at: string;
+  created_at: string;
+}
+
+export interface PrivateMessage {
+  id: string;
+  chat_id: string;
+  sender_id: string;
+  content: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+// ============================================
+// ADMIN INBOX
+// ============================================
+export interface AdminInbox {
+  id: string;
+  sender_id: string | null;
+  sender_name: string;
+  message_type: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+// ============================================
 // EMOJI LIST FOR CHAT
 // ============================================
 export const EMOJI_LIST = [

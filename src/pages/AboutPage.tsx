@@ -58,8 +58,8 @@ export default function AboutPage() {
                 👨‍💻
               </div>
               <div>
-                <h3 className="font-rajdhani font-bold text-lg text-text">Criador</h3>
-                <p className="text-sm text-text2">Desenvolvido independentemente</p>
+                <h3 className="font-rajdhani font-bold text-lg text-text">José Eduardo Numa Canjo / itzal</h3>
+                <p className="text-sm text-text2">Criador independente</p>
               </div>
             </div>
             <p className="text-text3 text-sm leading-relaxed">

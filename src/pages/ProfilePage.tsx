@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { CLASS_INFO, type CharacterClass, type UserBadge, type Badge } from '../types/index';
-import { Trophy, Swords, TrendingUp, Clock, Medal, Crown, Users, Award, Shield } from 'lucide-react';
+import { Trophy, Swords, TrendingUp, Clock, Medal, Crown, Users, Award, Shield, MessageSquare } from 'lucide-react';
 import FollowButton from '../components/FollowButton';
 
 export default function ProfilePage() {
@@ -195,14 +195,25 @@ export default function ProfilePage() {
                     Editar Perfil
                   </Link>
                 ) : (
-                  <FollowButton
-                    targetUserId={profile.id}
-                    targetUsername={profile.username}
-                    onFollowChange={() => {
-                      // Refresh counts
-                      loadProfile();
-                    }}
-                  />
+                  <>
+                    <Link
+                      to="/messages"
+                      state={{ startChatWith: profile.id }}
+                      className="btn btn-ghost text-sm flex items-center gap-2"
+                      title="Enviar mensagem"
+                    >
+                      <MessageSquare size={16} />
+                      Mensagem
+                    </Link>
+                    <FollowButton
+                      targetUserId={profile.id}
+                      targetUsername={profile.username}
+                      onFollowChange={() => {
+                        // Refresh counts
+                        loadProfile();
+                      }}
+                    />
+                  </>
                 )}
               </div>
             </div>

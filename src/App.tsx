@@ -27,6 +27,10 @@ import TournamentsPage from './pages/TournamentsPage';
 import TermsPage from './pages/TermsPage';
 import HelpPage from './pages/HelpPage';
 import FeaturesPage from './pages/FeaturesPage';
+import GroupsPage from './pages/GroupsPage';
+import GroupDetailPage from './pages/GroupDetailPage';
+import MessagesPage from './pages/MessagesPage';
+import AdminInboxPage from './pages/AdminInboxPage';
 
 function App() {
   return (
@@ -58,6 +62,10 @@ function App() {
               <Route path="eventos" element={<EventsPage />} />
               <Route path="eventos/:id" element={<EventDetailPage />} />
               <Route path="chat" element={<ChatPage />} />
+              <Route path="groups" element={<GroupsPage />} />
+              <Route path="groups/:id" element={<GroupDetailPage />} />
+              <Route path="messages" element={<MessagesPage />} />
+              <Route path="inbox" element={<AdminInboxPage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

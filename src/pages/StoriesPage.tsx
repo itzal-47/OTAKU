@@ -71,7 +71,7 @@ export default function StoriesPage() {
       const [profilesData, charactersData, viewsData] = await Promise.all([
         supabase.from('profiles').select('id, username').in('id', userIds),
         supabase.from('characters').select('user_id, name, class').in('user_id', userIds),
-        user ? supabase.from('story_views').select('story_id').eq('viewer_id', user.id) : { data: [] }
+        user ? supabase.from('story_views').select('story_id').eq('user_id', user.id) : { data: [] }
       ]);
 
       const viewedStoryIds = new Set(viewsData.data?.map(v => v.story_id) || []);
@@ -143,13 +143,13 @@ export default function StoriesPage() {
     setUploadingFile(true);
     try {
       const { error: uploadError } = await supabase.storage
-        .from('stories-media')
+        .from('uploads')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('stories-media')
+        .from('uploads')
         .getPublicUrl(filePath);
 
       setUploadedMediaUrl(publicUrl);
