@@ -20,12 +20,21 @@ export default function NotificationBell() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (user) {
       loadNotifications();
 
+      // Clean up any existing channel before creating new one
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+
       const channel = supabase.channel('notifications');
+      channelRef.current = channel;
+
       channel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -33,7 +42,12 @@ export default function NotificationBell() {
       }, () => {
         loadNotifications();
       });
-      channel.subscribe();
+
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('NotificationBell subscribed');
+        }
+      });
     }
 
     // Close dropdown when clicking outside
@@ -43,7 +57,13 @@ export default function NotificationBell() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [user]);
 
   async function loadNotifications() {

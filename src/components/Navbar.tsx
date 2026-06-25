@@ -1,16 +1,28 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap, MessageSquare, Inbox } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const { user, profile, signOut } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hamburgerOpen, setHamburgerOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => location.pathname === path;
   const isAuth = location.pathname === '/login';
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (hamburgerRef.current && !hamburgerRef.current.contains(event.target as Node)) {
+        setHamburgerOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-10 h-16 bg-bg/85 backdrop-blur-xl border-b border-border">
@@ -24,7 +36,7 @@ export default function Navbar() {
       </Link>
 
       {/* Desktop nav */}
-      <ul className="hidden md:flex items-center gap-1 list-none">
+      <ul className="hidden lg:flex items-center gap-1 list-none">
         {[
           { path: '/feed', label: 'Feed' },
           { path: '/stories', label: 'Stories' },
@@ -51,10 +63,83 @@ export default function Navbar() {
       </ul>
 
       {/* Auth buttons */}
-      <div className="hidden md:flex items-center gap-2">
+      <div className="hidden lg:flex items-center gap-2">
         <Link to="/search" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors">
           <Search size={18} className="text-text2 hover:text-text" />
         </Link>
+
+        {/* Hamburger Menu Button */}
+        <div className="relative" ref={hamburgerRef}>
+          <button
+            onClick={() => setHamburgerOpen(!hamburgerOpen)}
+            className={`w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors ${hamburgerOpen ? 'bg-bg3' : ''}`}
+            title="Mais secções"
+          >
+            <div className="flex flex-col gap-1">
+              <span className={`block h-0.5 w-4 bg-text2 transition-all ${hamburgerOpen ? 'rotate-45 translate-y-1.5' : ''}`} />
+              <span className={`block h-0.5 w-4 bg-text2 transition-all ${hamburgerOpen ? 'opacity-0' : ''}`} />
+              <span className={`block h-0.5 w-4 bg-text2 transition-all ${hamburgerOpen ? '-rotate-45 -translate-y-1.5' : ''}`} />
+            </div>
+          </button>
+          {hamburgerOpen && (
+            <div className="absolute right-0 top-full mt-2 w-56 bg-bg2 border border-border rounded-2xl shadow-lg overflow-hidden z-50 py-2">
+              <div className="px-4 py-2 text-xs text-text3 uppercase tracking-wider font-bold border-b border-border mb-2">
+                Mais Secções
+              </div>
+              <Link
+                to="/quotes"
+                onClick={() => setHamburgerOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/quotes') ? 'text-purple2' : 'text-text2'}`}
+              >
+                <Quote size={16} /> Citações Anime
+              </Link>
+              <Link
+                to="/fanart"
+                onClick={() => setHamburgerOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/fanart') ? 'text-purple2' : 'text-text2'}`}
+              >
+                <Image size={16} /> Fan Art Gallery
+              </Link>
+              <Link
+                to="/ost"
+                onClick={() => setHamburgerOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/ost') ? 'text-purple2' : 'text-text2'}`}
+              >
+                <Music size={16} /> Música / OST
+              </Link>
+              <Link
+                to="/watchlist"
+                onClick={() => setHamburgerOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/watchlist') ? 'text-purple2' : 'text-text2'}`}
+              >
+                <Eye size={16} /> Anime Watchlist
+              </Link>
+              <Link
+                to="/wiki"
+                onClick={() => setHamburgerOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/wiki') ? 'text-purple2' : 'text-text2'}`}
+              >
+                <BookOpen size={16} /> Wiki / Base
+              </Link>
+              <div className="border-t border-border mt-2 pt-2">
+                <Link
+                  to="/quests"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/quests') ? 'text-purple2' : 'text-text2'}`}
+                >
+                  <Zap size={16} /> Missões
+                </Link>
+                <Link
+                  to="/badges"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/badges') ? 'text-purple2' : 'text-text2'}`}
+                >
+                  <Zap size={16} /> Badges
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
 
         {user ? (
           <>
@@ -87,13 +172,13 @@ export default function Navbar() {
           </>
         ) : isAuth ? null : (
           <>
-            <Link to="/feedback" className="text-sm text-text3 hover:text-text px-3 py-2 hidden lg:block">
+            <Link to="/feedback" className="text-sm text-text3 hover:text-text px-3 py-2 hidden xl:block">
               Feedback
             </Link>
-            <Link to="/termos" className="text-sm text-text3 hover:text-text px-3 py-2 hidden lg:block">
+            <Link to="/termos" className="text-sm text-text3 hover:text-text px-3 py-2 hidden xl:block">
               Termos
             </Link>
-            <Link to="/ajuda" className="text-sm text-text3 hover:text-text px-3 py-2 hidden lg:block">
+            <Link to="/ajuda" className="text-sm text-text3 hover:text-text px-3 py-2 hidden xl:block">
               Ajuda
             </Link>
             <Link to="/login" className="btn btn-ghost text-sm">
@@ -108,7 +193,7 @@ export default function Navbar() {
 
       {/* Mobile toggle */}
       <button
-        className="md:hidden p-2 text-text2 hover:text-text"
+        className="lg:hidden p-2 text-text2 hover:text-text"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X size={24} /> : <Menu size={24} />}
@@ -116,7 +201,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="absolute top-16 left-0 right-0 bg-bg2 border-b border-border md:hidden">
+        <div className="absolute top-16 left-0 right-0 bg-bg2 border-b border-border lg:hidden">
           <div className="flex flex-col p-4 gap-2">
             {[
               { path: '/feed', label: '📰 Feed' },
@@ -132,6 +217,31 @@ export default function Navbar() {
               { path: '/termos', label: '📄 Termos' },
               { path: '/ajuda', label: '❓ Ajuda' },
               { path: '/funcionalidades', label: '✨ Funcionalidades' },
+            ].map(({ path, label }) => (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setMobileOpen(false)}
+                className={`px-4 py-3 rounded-lg text-sm font-medium ${
+                  isActive(path) ? 'text-purple2 bg-bg3' : 'text-text2'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+            <div className="h-px bg-border my-2" />
+            {/* Hamburger sections on mobile */}
+            <div className="px-4 py-2 text-xs text-text3 uppercase tracking-wider font-bold">
+              Mais Secções
+            </div>
+            {[
+              { path: '/quotes', label: '💬 Citações' },
+              { path: '/fanart', label: '🎨 Fan Art' },
+              { path: '/ost', label: '🎵 Música / OST' },
+              { path: '/watchlist', label: '📺 Watchlist' },
+              { path: '/wiki', label: '📚 Wiki' },
+              { path: '/quests', label: '⚡ Missões' },
+              { path: '/badges', label: '🏅 Badges' },
             ].map(({ path, label }) => (
               <Link
                 key={path}

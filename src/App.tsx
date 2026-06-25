@@ -32,6 +32,13 @@ import GroupDetailPage from './pages/GroupDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import AdminInboxPage from './pages/AdminInboxPage';
 import FeedbackPage from './pages/FeedbackPage';
+import QuestsPage from './pages/QuestsPage';
+import BadgesPage from './pages/BadgesPage';
+import QuotesPage from './pages/QuotesPage';
+import WatchlistPage from './pages/WatchlistPage';
+import FanArtPage from './pages/FanArtPage';
+import OSTPage from './pages/OSTPage';
+import WikiPage from './pages/WikiPage';
 
 function App() {
   return (
@@ -68,6 +75,13 @@ function App() {
               <Route path="messages" element={<MessagesPage />} />
               <Route path="inbox" element={<AdminInboxPage />} />
               <Route path="feedback" element={<FeedbackPage />} />
+              <Route path="quests" element={<QuestsPage />} />
+              <Route path="badges" element={<BadgesPage />} />
+              <Route path="quotes" element={<QuotesPage />} />
+              <Route path="watchlist" element={<WatchlistPage />} />
+              <Route path="fanart" element={<FanArtPage />} />
+              <Route path="ost" element={<OSTPage />} />
+              <Route path="wiki" element={<WikiPage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

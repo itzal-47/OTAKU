@@ -4,6 +4,7 @@ import { CLASS_INFO, type CharacterClass } from '../types/index';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import StoriesBar from '../components/StoriesBar';
+import OnboardingScreen from '../components/OnboardingScreen';
 
 interface Stats {
   warriors: number;
@@ -14,6 +15,13 @@ interface Stats {
 export default function HomePage() {
   const { user, character } = useAuth();
   const [stats, setStats] = useState<Stats>({ warriors: 0, duels: 0, online: 0 });
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (user && typeof window !== 'undefined' && !localStorage.getItem('otakukamba-onboarding')) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
 
   useEffect(() => {
     async function loadStats() {
@@ -38,6 +46,16 @@ export default function HomePage() {
 
   return (
     <div className="relative overflow-hidden">
+      {/* Onboarding */}
+      {showOnboarding && user && (
+        <OnboardingScreen
+          onComplete={() => {
+            localStorage.setItem('otakukamba-onboarding', '1');
+            setShowOnboarding(false);
+          }}
+        />
+      )}
+
       {/* Kanji Background */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.025] font-japanese text-[120px] font-light leading-tight break-all p-5 select-none overflow-hidden text-purple/50">
         戦闘忍者海賊死神魔法剣士悪魔竜王英雄勝利力夢希望戦闘忍者海賊死神魔法剣士悪魔竜王英雄勝利力夢希望

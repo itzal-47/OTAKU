@@ -10,7 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, username: string, characterClass: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, username: string, characterClass: string, province?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id]);
 
-  const signUp = async (email: string, password: string, username: string, characterClass: string) => {
+  const signUp = async (email: string, password: string, username: string, characterClass: string, province?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -104,19 +104,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setUser(data.session.user);
 
-      // Create profile immediately - await it properly
+      const userId = data.session.user.id;
+
       try {
-        const userId = data.session.user.id;
-        await supabase.from('profiles').insert({
+        // Create profile with all required fields
+        const profileInsert = await supabase.from('profiles').insert({
           id: userId,
           username,
           email,
+          province: province || null,
+          city: province || null,
           is_admin: false,
           is_super_admin: false,
           is_event_publisher: false
         });
+
+        if (profileInsert.error) {
+          console.error('Profile insert error:', profileInsert.error);
+        }
+
         // Create user_settings
-        await supabase.from('user_settings').insert({
+        const settingsInsert = await supabase.from('user_settings').insert({
           user_id: userId,
           theme: 'dark',
           notifications_enabled: true,
@@ -125,15 +133,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           show_character: true,
           language: 'pt'
         });
+
+        if (settingsInsert.error) {
+          console.error('Settings insert error:', settingsInsert.error);
+        }
+
         // Check if this is the first user -> make super admin
         const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
         if (count === 1) {
           await supabase.from('profiles').update({ is_super_admin: true, is_admin: true }).eq('id', userId);
         }
+
         // Create default character if not exists
         const { data: existingChar } = await supabase.from('characters').select('*').eq('user_id', userId).maybeSingle();
         if (!existingChar) {
-          await supabase.from('characters').insert({
+          const characterInsert = await supabase.from('characters').insert({
             user_id: userId,
             name: username,
             class: characterClass || 'ninja',
@@ -149,7 +163,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             losses: 0,
             draws: 0
           });
+
+          if (characterInsert.error) {
+            console.error('Character insert error:', characterInsert.error);
+          }
         }
+
+        // Refresh local state
         const prof = await getCurrentProfile();
         setProfile(prof);
         if (prof) {
