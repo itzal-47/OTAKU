@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen } from 'lucide-react';
+import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -123,6 +123,27 @@ export default function Navbar() {
               </Link>
               <div className="border-t border-border mt-2 pt-2">
                 <Link
+                  to="/loja"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/loja') ? 'text-purple2' : 'text-text2'}`}
+                >
+                  <Zap size={16} /> Loja do Kamba
+                </Link>
+                <Link
+                  to="/guia"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/guia') ? 'text-purple2' : 'text-text2'}`}
+                >
+                  <BookOpen size={16} /> Guia dos Kambas
+                </Link>
+                <Link
+                  to="/conquistas"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/conquistas') ? 'text-purple2' : 'text-text2'}`}
+                >
+                  <Trophy size={16} /> Conquistas
+                </Link>
+                <Link
                   to="/quests"
                   onClick={() => setHamburgerOpen(false)}
                   className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/quests') ? 'text-purple2' : 'text-text2'}`}
@@ -240,6 +261,9 @@ export default function Navbar() {
               { path: '/ost', label: '🎵 Música / OST' },
               { path: '/watchlist', label: '📺 Watchlist' },
               { path: '/wiki', label: '📚 Wiki' },
+              { path: '/loja', label: '🛒 Loja do Kamba' },
+              { path: '/guia', label: '📖 Guia dos Kambas' },
+              { path: '/conquistas', label: '🏆 Conquistas' },
               { path: '/quests', label: '⚡ Missões' },
               { path: '/badges', label: '🏅 Badges' },
             ].map(({ path, label }) => (

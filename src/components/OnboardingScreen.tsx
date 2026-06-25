@@ -6,6 +6,7 @@ interface OnboardingSlide {
   subtitle: string;
   character: string;
   background: string;
+  bgAnimated?: string;
 }
 
 const slides: OnboardingSlide[] = [
@@ -13,7 +14,8 @@ const slides: OnboardingSlide[] = [
     title: "Bem-vindo ao OtakuKamba",
     subtitle: "A plataforma feita por angolanos, para angolanos",
     character: "🌸",
-    background: "from-purple-950 via-bg to-purple-900"
+    background: "from-purple-950 via-bg to-purple-900",
+    bgAnimated: "animate-pulse-slow"
   },
   {
     title: "Duelos Épicos",
@@ -135,12 +137,54 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
   return (
     <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-700 bg-gradient-to-br ${slide.background}`}>
-      {/* Cinematic vignette */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)] pointer-events-none" />
-
-      {/* Floating particles */}
+      {/* Animated background orbs - unique for this onboarding */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 20 }).map((_, i) => (
+        {/* Large animated orbs */}
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full blur-[100px] opacity-30 animate-float"
+          style={{
+            background: `radial-gradient(circle, rgba(var(--color-purple-rgb), 0.25) 0%, transparent 70%)`,
+            left: '-20%',
+            top: '-10%'
+          }}
+        />
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full blur-[80px] opacity-25 animate-float"
+          style={{
+            background: `radial-gradient(circle, rgba(var(--color-red-rgb), 0.2) 0%, transparent 70%)`,
+            right: '-15%',
+            bottom: '-10%',
+            animationDelay: '-4s'
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full blur-[90px] opacity-20 animate-float"
+          style={{
+            background: `radial-gradient(circle, rgba(var(--color-amber-rgb), 0.15) 0%, transparent 70%)`,
+            left: '30%',
+            bottom: '-20%',
+            animationDelay: '-2s'
+          }}
+        />
+
+        {/* Energy lines */}
+        <div className="absolute inset-0">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute h-px bg-gradient-to-r from-transparent via-white/10 to-transparent animate-energy-line"
+              style={{
+                width: '100%',
+                top: `${10 + i * 12}%`,
+                animationDelay: `${i * 0.4}s`,
+                transform: `rotate(${-5 + i * 1.2}deg)`
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Floating particles */}
+        {Array.from({ length: 30 }).map((_, i) => (
           <div
             key={i}
             className="absolute w-1 h-1 bg-white/20 rounded-full animate-float"
@@ -152,17 +196,37 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             }}
           />
         ))}
+
+        {/* Sparkle effect */}
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={`spark-${i}`}
+            className="absolute w-2 h-2 bg-white/40 rounded-full animate-sparkle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 2}s`
+            }}
+          />
+        ))}
       </div>
+
+      {/* Cinematic vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)] pointer-events-none" />
 
       {/* Content */}
       <div className={`relative z-10 text-center px-6 max-w-2xl mx-auto transition-all duration-700 ${fadeClass}`}>
-        {/* Character emoji */}
-        <div className="text-8xl mb-8 animate-bounce-slow">
-          {slide.character}
+        {/* Character emoji with glow */}
+        <div className="relative inline-block mb-8">
+          <div className="absolute inset-0 blur-2xl bg-white/20 scale-150" />
+          <div className="relative text-8xl animate-bounce-slow">
+            {slide.character}
+          </div>
         </div>
 
-        {/* Title */}
-        <h1 className="font-bebas text-5xl md:text-7xl tracking-wider text-white mb-6 leading-tight">
+        {/* Title with glow effect */}
+        <h1 className="font-bebas text-5xl md:text-7xl tracking-wider text-white mb-6 leading-tight drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
           {slide.title}
         </h1>
 
@@ -179,9 +243,9 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
               onClick={() => goToSlide(index)}
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 index === currentSlide
-                  ? 'w-8 bg-purple'
+                  ? 'w-8 bg-white'
                   : index < currentSlide
-                  ? 'w-2 bg-purple/50'
+                  ? 'w-2 bg-white/50'
                   : 'w-2 bg-white/20'
               }`}
             />
@@ -200,7 +264,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
 
           <button
             onClick={nextSlide}
-            className="px-8 py-3 bg-purple text-white rounded-xl font-rajdhani font-bold text-lg hover:bg-purple/80 transition-all"
+            className="px-8 py-3 bg-white text-bg rounded-xl font-rajdhani font-bold text-lg hover:bg-white/90 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)]"
           >
             {currentSlide === slides.length - 1 ? 'Começar' : 'Próximo'}
           </button>

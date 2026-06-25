@@ -5,14 +5,42 @@ import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
 import {
   Shield, Users, Trophy, Plus, Search, X, Crown, Star,
-  Swords, ChevronRight, Loader, UserPlus, UserX, Settings, Trash2
+  Swords, ChevronRight, Loader, UserPlus, UserX, Settings, Trash2,
+  TrendingUp, Target, Flame, Award, Zap, Gift
 } from 'lucide-react';
 import type { Clan, ClanMember, ClanRequest } from '../types/index';
+
+interface ClanContribution {
+  id: string;
+  user_id: string;
+  type: string;
+  amount: number;
+  source: string;
+  created_at: string;
+  user?: { username: string };
+}
+
+interface ClanWithStats extends Clan {
+  clan_level?: number;
+  clan_xp?: number;
+  weekly_contribution?: number;
+}
+
+interface LegendaryClan {
+  id: string;
+  name: string;
+  tag: string;
+  clan_level?: number;
+  weekly_contribution?: number;
+  total_members: number;
+  logo_url?: string;
+}
 
 export default function ClansPage() {
   const { user, profile, character } = useAuth();
   const { showToast } = useToast();
-  const [clans, setClans] = useState<Clan[]>([]);
+  const [clans, setClans] = useState<ClanWithStats[]>([]);
+  const [legendaryClans, setLegendaryClans] = useState<LegendaryClan[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -20,7 +48,8 @@ export default function ClansPage() {
   const [myClan, setMyClan] = useState<ClanMember | null>(null);
   const [clanMembers, setClanMembers] = useState<ClanMember[]>([]);
   const [clanRequests, setClanRequests] = useState<ClanRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'requests' | 'settings'>('overview');
+  const [clanContributions, setClanContributions] = useState<ClanContribution[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'contributions' | 'requests' | 'settings'>('overview');
 
   // Create form
   const [createForm, setCreateForm] = useState({
@@ -32,6 +61,7 @@ export default function ClansPage() {
 
   useEffect(() => {
     loadClans();
+    loadLegendaryClans();
     if (user) loadMyClan();
   }, [user]);
 
@@ -41,13 +71,27 @@ export default function ClansPage() {
       const { data } = await supabase
         .from('clans')
         .select('*')
-        .order('total_wins', { ascending: false });
+        .order('weekly_contribution', { ascending: false });
 
       setClans(data || []);
     } catch (error) {
       console.error('Error loading clans:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadLegendaryClans() {
+    try {
+      const { data } = await supabase
+        .from('clans')
+        .select('id, name, tag, clan_level, weekly_contribution, total_members, logo_url')
+        .order('weekly_contribution', { ascending: false })
+        .limit(5);
+
+      setLegendaryClans(data || []);
+    } catch (error) {
+      console.error('Error loading legendary clans:', error);
     }
   }
 
@@ -72,7 +116,7 @@ export default function ClansPage() {
   }
 
   async function loadClanDetails(clanId: string) {
-    const [membersRes, requestsRes] = await Promise.all([
+    const [membersRes, requestsRes, contribRes] = await Promise.all([
       supabase
         .from('clan_members')
         .select('*, user:profiles(id, username, province), character:characters(name, class, level)')
@@ -82,11 +126,18 @@ export default function ClansPage() {
         .from('clan_requests')
         .select('*, user:profiles(id, username)')
         .eq('clan_id', clanId)
-        .eq('status', 'pending')
+        .eq('status', 'pending'),
+      supabase
+        .from('clan_contributions')
+        .select('*, user:profiles(username)')
+        .eq('clan_id', clanId)
+        .order('created_at', { ascending: false })
+        .limit(20)
     ]);
 
     setClanMembers(membersRes.data || []);
     setClanRequests(requestsRes.data || []);
+    setClanContributions(contribRes.data || []);
   }
 
   async function handleCreateClan(e: React.FormEvent) {
@@ -96,7 +147,7 @@ export default function ClansPage() {
       return;
     }
 
-    if (!profile?.is_admin) {
+    if (!profile?.is_admin && !profile?.is_super_admin) {
       showToast('Apenas admins podem criar clãs', 'error');
       return;
     }
@@ -112,7 +163,6 @@ export default function ClansPage() {
     }
 
     try {
-      // Create clan
       const { data: clanData, error: clanError } = await supabase
         .from('clans')
         .insert({
@@ -121,20 +171,21 @@ export default function ClansPage() {
           description: createForm.description,
           min_level: createForm.min_level,
           leader_id: user.id,
+          clan_level: 1,
+          clan_xp: 0,
+          weekly_contribution: 0,
         })
         .select()
         .single();
 
       if (clanError) throw clanError;
 
-      // Add creator as leader
       await supabase.from('clan_members').insert({
         clan_id: clanData.id,
         user_id: user.id,
         role: 'leader',
       });
 
-      // Update clan member count
       await supabase
         .from('clans')
         .update({ total_members: 1 })
@@ -145,6 +196,7 @@ export default function ClansPage() {
       setCreateForm({ name: '', tag: '', description: '', min_level: 1 });
       loadClans();
       loadMyClan();
+      loadLegendaryClans();
     } catch (error: any) {
       if (error.code === '23505') {
         showToast('Nome ou tag já existe', 'error');
@@ -189,25 +241,30 @@ export default function ClansPage() {
 
   async function handleAcceptRequest(requestId: string, userId: string, clanId: string) {
     try {
-      // Add member
       await supabase.from('clan_members').insert({
         clan_id: clanId,
         user_id: userId,
         role: 'member',
       });
 
-      // Update request status
       await supabase
         .from('clan_requests')
         .update({ status: 'accepted', reviewed_by: user?.id })
         .eq('id', requestId);
 
-      // Update member count
-      await supabase.rpc('increment_clan_members', { clan_id: clanId });
+      // Add contribution for joining
+      await supabase.rpc('add_clan_contribution', {
+        p_clan_id: clanId,
+        p_user_id: userId,
+        p_type: 'xp',
+        p_amount: 50,
+        p_source: 'new_member'
+      });
 
       showToast('Membro aceite!', 'success');
       loadClanDetails(clanId);
       loadClans();
+      loadLegendaryClans();
     } catch {
       showToast('Erro ao aceitar', 'error');
     }
@@ -236,11 +293,9 @@ export default function ClansPage() {
         .delete()
         .eq('user_id', user.id);
 
-      // If leader, transfer or delete clan
       if (myClan.role === 'leader') {
         const officers = clanMembers.filter(m => m.role === 'officer');
         if (officers.length > 0) {
-          // Transfer leadership to first officer
           await supabase
             .from('clan_members')
             .update({ role: 'leader' })
@@ -250,12 +305,10 @@ export default function ClansPage() {
             .update({ leader_id: officers[0].user_id })
             .eq('id', myClan.clan_id);
         } else {
-          // Delete clan if no other members
           const otherMembers = clanMembers.filter(m => m.user_id !== user.id);
           if (otherMembers.length === 0) {
             await supabase.from('clans').delete().eq('id', myClan.clan_id);
           } else {
-            // Transfer to oldest member
             await supabase
               .from('clan_members')
               .update({ role: 'leader' })
@@ -268,13 +321,11 @@ export default function ClansPage() {
         }
       }
 
-      // Update member count
-      await supabase.rpc('decrement_clan_members', { clan_id: myClan.clan_id });
-
       showToast('Saíste do clã', 'info');
       setMyClan(null);
       setShowClanDetail(null);
       loadClans();
+      loadLegendaryClans();
     } catch {
       showToast('Erro ao sair', 'error');
     }
@@ -297,10 +348,13 @@ export default function ClansPage() {
   async function handleKickMember(memberId: string, clanId: string) {
     try {
       await supabase.from('clan_members').delete().eq('id', memberId);
-      await supabase.rpc('decrement_clan_members', { clan_id: clanId });
+
+      await supabase.rpc('decrement_clan_members', { p_clan_id: clanId });
 
       showToast('Membro removido', 'info');
       loadClanDetails(clanId);
+      loadClans();
+      loadLegendaryClans();
     } catch {
       showToast('Erro ao remover', 'error');
     }
@@ -314,6 +368,14 @@ export default function ClansPage() {
   const isLeader = myClan?.role === 'leader';
   const isOfficer = myClan?.role === 'officer' || isLeader;
 
+  // Calculate clan level progress
+  const getClanLevelProgress = (xp: number) => {
+    const levelThreshold = 1000;
+    const currentLevel = Math.floor(xp / levelThreshold) + 1;
+    const progress = (xp % levelThreshold) / levelThreshold * 100;
+    return { level: currentLevel, progress };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-16">
@@ -325,13 +387,55 @@ export default function ClansPage() {
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
       <div className="max-w-6xl mx-auto">
+        {/* Legendary Clans - Top of home page */}
+        {legendaryClans.length > 0 && (
+          <div className="mb-8 bg-gradient-to-br from-amber/10 via-bg2 to-purple/10 border border-amber/30 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Crown className="text-amber" size={24} />
+              <h2 className="font-bebas text-2xl text-text tracking-wide">Clãs Lendários</h2>
+              <span className="text-xs bg-amber/20 text-amber px-2 py-1 rounded-full">Semana</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+              {legendaryClans.map((clan, idx) => (
+                <Link
+                  key={clan.id}
+                  to={`/clas`}
+                  onClick={() => {
+                    const fullClan = clans.find(c => c.id === clan.id);
+                    if (fullClan) setShowClanDetail(fullClan);
+                  }}
+                  className="flex-shrink-0 min-w-[180px] bg-bg3 border border-border rounded-xl p-4 hover:border-amber/50 transition-all"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber/30 to-purple/30 flex items-center justify-center text-amber font-bold">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <div className="font-rajdhani font-bold text-text text-sm">{clan.name}</div>
+                      <div className="text-xs text-text3">[{clan.tag}]</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-text3">
+                    <span className="flex items-center gap-1">
+                      <Trophy size={12} className="text-amber" /> Nv.{clan.clan_level}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Zap size={12} className="text-purple" /> {clan.weekly_contribution}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="font-bebas text-4xl text-text">Clãs</h1>
-            <p className="text-text3 text-sm">Une forças com outros guerreiros</p>
+            <p className="text-text3 text-sm">Une forças com outros guerreiros e domina o ranking</p>
           </div>
-          {user && character && !myClan && profile?.is_admin && (
+          {user && character && !myClan && (profile?.is_admin || profile?.is_super_admin) && (
             <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
               <Plus size={18} />
               Criar Clã
@@ -375,8 +479,31 @@ export default function ClansPage() {
                 </div>
               </div>
               <button onClick={() => myClan.clan && setShowClanDetail(myClan.clan)} className="btn btn-ghost flex items-center gap-2">
-                Ver Detalhes <ChevronRight size={16} />
+                Ver Dashboard <ChevronRight size={16} />
               </button>
+            </div>
+
+            {/* Clan Level Progress */}
+            <div className="bg-bg3 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-text2 flex items-center gap-2">
+                  <TrendingUp size={14} className="text-teal" />
+                  Nível do Clã
+                </span>
+                <span className="font-bebas text-lg text-amber">
+                  Nv. {getClanLevelProgress(myClan.clan.clan_xp || 0).level}
+                </span>
+              </div>
+              <div className="h-2 bg-bg rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple via-amber to-red transition-all"
+                  style={{ width: `${getClanLevelProgress(myClan.clan.clan_xp || 0).progress}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-xs text-text3">
+                <span>{myClan.clan.clan_xp || 0} XP total</span>
+                <span>+{myClan.clan.weekly_contribution || 0} esta semana</span>
+              </div>
             </div>
           </div>
         )}
@@ -390,48 +517,59 @@ export default function ClansPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredClans.map(clan => (
-              <div
-                key={clan.id}
-                className="bg-bg2 border border-border rounded-xl p-5 hover:border-purple/50 transition-all"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple/20 to-red/20 flex items-center justify-center text-lg font-bold">
-                    {clan.tag}
+            {filteredClans.map(clan => {
+              const levelInfo = getClanLevelProgress(clan.clan_xp || 0);
+              return (
+                <div
+                  key={clan.id}
+                  className="bg-bg2 border border-border rounded-xl p-5 hover:border-purple/50 transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple/20 to-red/20 flex items-center justify-center text-lg font-bold">
+                      {clan.tag}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-rajdhani font-bold text-text truncate">{clan.name}</h3>
+                      <p className="text-xs text-text3">
+                        {clan.total_members} membros · Nv. {levelInfo.level}
+                      </p>
+                    </div>
+                    {!clan.is_recruiting && (
+                      <span className="text-xs bg-text3/20 text-text3 px-2 py-1 rounded-full">Fechado</span>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-rajdhani font-bold text-text truncate">{clan.name}</h3>
-                    <p className="text-xs text-text3">
-                      {clan.total_members} membros · Nv. {clan.min_level}+
-                    </p>
-                  </div>
-                  {!clan.is_recruiting && (
-                    <span className="text-xs bg-text3/20 text-text3 px-2 py-1 rounded-full">Fechado</span>
-                  )}
-                </div>
 
-                <p className="text-sm text-text2 mb-4 line-clamp-2">{clan.description || 'Sem descrição'}</p>
+                  <p className="text-sm text-text2 mb-4 line-clamp-2">{clan.description || 'Sem descrição'}</p>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-sm text-text3">
-                    <span className="flex items-center gap-1">
-                      <Trophy size={14} className="text-amber" />
-                      {clan.total_wins}
+                  {/* Weekly contribution badge */}
+                  <div className="flex items-center gap-2 mb-3 text-xs">
+                    <span className="flex items-center gap-1 bg-amber/10 text-amber px-2 py-1 rounded-full">
+                      <Zap size={12} />
+                      {clan.weekly_contribution || 0} XP/semana
                     </span>
                   </div>
-                  {myClan?.clan_id === clan.id ? (
-                    <span className="text-xs text-purple font-semibold">Teu Clã</span>
-                  ) : clan.is_recruiting && !myClan ? (
-                    <button
-                      onClick={() => handleJoinRequest(clan)}
-                      className="btn btn-ghost text-xs py-1.5 px-3"
-                    >
-                      Pedir Entrada
-                    </button>
-                  ) : null}
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm text-text3">
+                      <span className="flex items-center gap-1">
+                        <Trophy size={14} className="text-amber" />
+                        {clan.total_wins}
+                      </span>
+                    </div>
+                    {myClan?.clan_id === clan.id ? (
+                      <span className="text-xs text-purple font-semibold">Teu Clã</span>
+                    ) : clan.is_recruiting && !myClan ? (
+                      <button
+                        onClick={() => handleJoinRequest(clan)}
+                        className="btn btn-ghost text-xs py-1.5 px-3"
+                      >
+                        Pedir Entrada
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -511,12 +649,12 @@ export default function ClansPage() {
           </div>
         )}
 
-        {/* Clan Detail Modal */}
+        {/* Clan Dashboard Modal */}
         {showClanDetail && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-bg2 border border-border rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="bg-bg2 border border-border rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
               {/* Header */}
-              <div className="p-6 border-b border-border">
+              <div className="p-6 border-b border-border bg-gradient-to-r from-purple/10 to-amber/10">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple to-red flex items-center justify-center text-2xl font-bold">
@@ -524,9 +662,13 @@ export default function ClansPage() {
                     </div>
                     <div>
                       <h2 className="font-rajdhani font-bold text-xl text-text">{showClanDetail.name}</h2>
-                      <p className="text-sm text-text3">
-                        {showClanDetail.total_members} membros · {showClanDetail.total_wins} vitórias
-                      </p>
+                      <div className="flex items-center gap-3 text-sm text-text3">
+                        <span>{showClanDetail.total_members} membros</span>
+                        <span>·</span>
+                        <span className="text-amber">Nv. {getClanLevelProgress(showClanDetail.clan_xp || 0).level}</span>
+                        <span>·</span>
+                        <span>{showClanDetail.total_wins} vitórias</span>
+                      </div>
                     </div>
                   </div>
                   <button onClick={() => setShowClanDetail(null)} className="text-text3 hover:text-text">
@@ -535,20 +677,22 @@ export default function ClansPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 mt-4">
+                <div className="flex gap-2 mt-4 overflow-x-auto no-scrollbar">
                   {[
-                    { id: 'overview', label: 'Visão Geral' },
-                    { id: 'members', label: 'Membros' },
-                    ...(isOfficer ? [{ id: 'requests', label: 'Pedidos' }] : []),
-                    ...(isLeader ? [{ id: 'settings', label: 'Config' }] : []),
+                    { id: 'overview', label: 'Dashboard', icon: Target },
+                    { id: 'members', label: 'Membros', icon: Users },
+                    { id: 'contributions', label: 'Contribuições', icon: TrendingUp },
+                    ...(isOfficer ? [{ id: 'requests', label: 'Pedidos', icon: UserPlus }] : []),
+                    ...(isLeader ? [{ id: 'settings', label: 'Config', icon: Settings }] : []),
                   ].map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                         activeTab === tab.id ? 'bg-purple text-white' : 'bg-bg3 text-text2 hover:text-text'
                       }`}
                     >
+                      <tab.icon size={14} />
                       {tab.label}
                     </button>
                   ))}
@@ -558,17 +702,77 @@ export default function ClansPage() {
               {/* Content */}
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 {activeTab === 'overview' && (
-                  <div>
-                    <p className="text-text2 mb-4">{showClanDetail.description || 'Sem descrição'}</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-bg3 rounded-xl p-4">
-                        <div className="text-2xl font-bebas text-text">{showClanDetail.total_members}</div>
-                        <div className="text-xs text-text3">Membros</div>
-                      </div>
-                      <div className="bg-bg3 rounded-xl p-4">
+                  <div className="space-y-6">
+                    {/* Description */}
+                    <p className="text-text2">{showClanDetail.description || 'Sem descrição'}</p>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-bg3 rounded-xl p-4 text-center">
+                        <Trophy className="mx-auto text-amber mb-2" size={24} />
                         <div className="text-2xl font-bebas text-text">{showClanDetail.total_wins}</div>
                         <div className="text-xs text-text3">Vitórias</div>
                       </div>
+                      <div className="bg-bg3 rounded-xl p-4 text-center">
+                        <Users className="mx-auto text-purple mb-2" size={24} />
+                        <div className="text-2xl font-bebas text-text">{showClanDetail.total_members}</div>
+                        <div className="text-xs text-text3">Membros</div>
+                      </div>
+                      <div className="bg-bg3 rounded-xl p-4 text-center">
+                        <TrendingUp className="mx-auto text-teal mb-2" size={24} />
+                        <div className="text-2xl font-bebas text-text">{showClanDetail.clan_xp || 0}</div>
+                        <div className="text-xs text-text3">XP Total</div>
+                      </div>
+                      <div className="bg-bg3 rounded-xl p-4 text-center">
+                        <Flame className="mx-auto text-red mb-2" size={24} />
+                        <div className="text-2xl font-bebas text-text">{showClanDetail.weekly_contribution || 0}</div>
+                        <div className="text-xs text-text3">Semana</div>
+                      </div>
+                    </div>
+
+                    {/* Level Progress */}
+                    <div className="bg-bg3 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-rajdhani font-bold text-text flex items-center gap-2">
+                          <Award className="text-amber" size={18} />
+                          Progresso do Clã
+                        </span>
+                        <span className="font-bebas text-xl text-amber">
+                          Nível {getClanLevelProgress(showClanDetail.clan_xp || 0).level}
+                        </span>
+                      </div>
+                      <div className="h-3 bg-bg rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple via-amber to-red transition-all"
+                          style={{ width: `${getClanLevelProgress(showClanDetail.clan_xp || 0).progress}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-text3 mt-2">
+                        Ganhe XP através de duelos, missões e contribuições dos membros.
+                      </p>
+                    </div>
+
+                    {/* Top contributors this week */}
+                    <div>
+                      <h3 className="font-rajdhani font-bold text-text mb-3 flex items-center gap-2">
+                        <Gift className="text-purple" size={18} />
+                        Contribuições Recentes
+                      </h3>
+                      {clanContributions.length === 0 ? (
+                        <p className="text-text3 text-sm">Sem contribuições ainda.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {clanContributions.slice(0, 5).map(contrib => (
+                            <div key={contrib.id} className="flex items-center justify-between bg-bg3 rounded-lg p-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-text">{contrib.user?.username || 'Utilizador'}</span>
+                                <span className="text-xs text-text3">{contrib.source}</span>
+                              </div>
+                              <span className="text-sm font-semibold text-teal">+{contrib.amount} XP</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -618,10 +822,33 @@ export default function ClansPage() {
                   </div>
                 )}
 
+                {activeTab === 'contributions' && (
+                  <div>
+                    <h3 className="font-rajdhani font-bold text-text mb-4">Histórico de Contribuições</h3>
+                    {clanContributions.length === 0 ? (
+                      <p className="text-text3 text-center py-8">Sem contribuições registadas ainda.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {clanContributions.map(contrib => (
+                          <div key={contrib.id} className="flex items-center justify-between bg-bg3 rounded-lg p-3">
+                            <div>
+                              <div className="font-semibold text-text text-sm">{contrib.user?.username || 'Utilizador'}</div>
+                              <div className="text-xs text-text3">
+                                {contrib.source} · {new Date(contrib.created_at).toLocaleDateString('pt-AO')}
+                              </div>
+                            </div>
+                            <span className="text-teal font-semibold">+{contrib.amount} XP</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeTab === 'requests' && isOfficer && (
                   <div className="space-y-2">
                     {clanRequests.length === 0 ? (
-                      <p className="text-text3 text-center py-4">Sem pedidos pendentes</p>
+                      <p className="text-text3 text-center py-8">Sem pedidos pendentes</p>
                     ) : (
                       clanRequests.map(req => (
                         <div key={req.id} className="flex items-center gap-3 bg-bg3 rounded-lg p-3">

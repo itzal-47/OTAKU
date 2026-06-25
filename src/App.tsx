@@ -39,6 +39,9 @@ import WatchlistPage from './pages/WatchlistPage';
 import FanArtPage from './pages/FanArtPage';
 import OSTPage from './pages/OSTPage';
 import WikiPage from './pages/WikiPage';
+import ShopPage from './pages/ShopPage';
+import GuidePage from './pages/GuidePage';
+import AchievementsPage from './pages/AchievementsPage';
 
 function App() {
   return (
@@ -82,6 +85,9 @@ function App() {
               <Route path="fanart" element={<FanArtPage />} />
               <Route path="ost" element={<OSTPage />} />
               <Route path="wiki" element={<WikiPage />} />
+              <Route path="loja" element={<ShopPage />} />
+              <Route path="guia" element={<GuidePage />} />
+              <Route path="conquistas" element={<AchievementsPage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

@@ -242,12 +242,115 @@ body {
   }
 }
 
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes energy-line {
+  0% {
+    transform: translateX(-100%) rotate(var(--rotation, 0deg));
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(100%) rotate(var(--rotation, 0deg));
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes aura-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes arena-glow {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.1);
+  }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
 
 .animate-bounce-slow {
   animation: bounce-slow 2s infinite;
+}
+
+.animate-sparkle {
+  animation: sparkle 3s ease-in-out infinite;
+}
+
+.animate-energy-line {
+  animation: energy-line 4s linear infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.animate-aura-pulse {
+  animation: aura-pulse 4s ease-out infinite;
+}
+
+.animate-blink {
+  animation: blink 2s ease-in-out infinite;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out forwards;
 }
 
 @keyframes progress {
@@ -289,5 +392,33 @@ button:focus-visible {
 @media (max-width: 640px) {
   .section-title {
     font-size: 1.875rem;
+  }
+
+  .section-inner {
+    padding: 2rem 0.75rem;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+
+  .btn-lg {
+    padding: 0.75rem 1.25rem;
+    font-size: 1rem;
+  }
+}
+
+/* Touch improvements */
+@media (hover: none) {
+  .btn:hover {
+    /* Remove hover effects on touch devices */
+    transform: none;
+  }
+
+  .card-hover:hover {
+    border-color: var(--border);
   }
 }

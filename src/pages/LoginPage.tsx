@@ -26,12 +26,21 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
   useEffect(() => {
     if (user) {
       navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    // Check if user just registered and needs email confirmation
+    if (typeof window !== 'undefined' && localStorage.getItem('otakukamba-pending-confirmation') === 'true') {
+      setPendingConfirmation(true);
+      localStorage.removeItem('otakukamba-pending-confirmation');
+    }
+  }, []);
 
   useEffect(() => {
     async function checkGeo() {
@@ -77,8 +86,13 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
-        if (error) throw error;
-        showToast('Bem-vindo de volta!', 'success');
+        if (error) {
+          if (error.message.includes('Email not confirmed')) {
+            throw new Error('Verifica o teu email! Enviámos um link de confirmação para a tua caixa de entrada. Verifica também o spam.');
+          }
+          throw error;
+        }
+        showToast('Bem-vindo de volta, guerreiro!', 'success');
         navigate('/dashboard');
       } else {
         if (username.length < 3) {
@@ -88,11 +102,16 @@ export default function LoginPage() {
           throw new Error('Palavra-passe deve ter pelo menos 8 caracteres');
         }
 
-        const { error } = await signUp(email, password, username, selectedClass, selectedProvince);
+        const { error, needsEmailConfirmation } = await signUp(email, password, username, selectedClass, selectedProvince);
         if (error) throw error;
 
-        showToast('Conta criada! Agora cria o teu personagem.', 'success');
-        navigate('/criar-personagem');
+        if (needsEmailConfirmation) {
+          setPendingConfirmation(true);
+          showToast('Verifica o teu email para confirmar a conta!', 'success');
+        } else {
+          showToast('Conta criada! Bem-vindo ao OtakuKamba!', 'success');
+          navigate('/criar-personagem');
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ocorreu um erro';
@@ -149,6 +168,25 @@ export default function LoginPage() {
       <div className="fixed w-[400px] h-[400px] -bottom-24 -right-24 bg-red/18 rounded-full blur-[90px] animate-float pointer-events-none" style={{ animationDelay: '-3s' }} />
 
       <div className="relative z-10 w-full max-w-md">
+        {/* Pending Confirmation Message */}
+        {pendingConfirmation && (
+          <div className="mb-4 bg-teal/10 border border-teal/30 rounded-xl px-4 py-4 text-sm text-teal">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">📧</span>
+              <span className="font-bold">Verifica o teu email!</span>
+            </div>
+            <p className="text-xs mt-1 text-teal/80">
+              Enviámos um link de confirmação para <strong>{email}</strong>. Verifica a tua caixa de entrada e spam. Clica no link para ativar a tua conta e começar a tua jornada no OtakuKamba!
+            </p>
+            <button
+              onClick={() => setPendingConfirmation(false)}
+              className="mt-3 text-xs text-teal/60 hover:text-teal underline"
+            >
+              Voltar ao login
+            </button>
+          </div>
+        )}
+
         {/* Geo Notice (not blocking) */}
         {countryName && !geoBlocked && (
           <div className="mb-4 bg-amber/10 border border-amber/30 rounded-xl px-4 py-3 text-sm text-amber">

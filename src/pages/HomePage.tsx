@@ -18,8 +18,18 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    if (user && typeof window !== 'undefined' && !localStorage.getItem('otakukamba-onboarding')) {
-      setShowOnboarding(true);
+    // Show onboarding for ALL new users (who haven't completed it)
+    if (user && typeof window !== 'undefined') {
+      const hasCompletedOnboarding = localStorage.getItem('otakukamba-onboarding');
+      const isNewUser = sessionStorage.getItem('otakukamba-new-user');
+
+      if (!hasCompletedOnboarding || isNewUser) {
+        // Mark as new session to show onboarding for new registrations
+        if (!hasCompletedOnboarding) {
+          sessionStorage.setItem('otakukamba-new-user', 'true');
+        }
+        setShowOnboarding(true);
+      }
     }
   }, [user]);
 

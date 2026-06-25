@@ -277,6 +277,9 @@ export interface Clan {
   total_members: number;
   is_recruiting: boolean;
   min_level: number;
+  clan_level?: number;
+  clan_xp?: number;
+  weekly_contribution?: number;
   created_at: string;
 }
 

@@ -10,7 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, username: string, characterClass: string, province?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, username: string, characterClass: string, province?: string) => Promise<{ error: Error | null; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -92,96 +92,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: {
         data: {
           username,
-          character_class: characterClass
+          character_class: characterClass,
+          province
         }
       }
     });
 
     if (error) return { error };
 
+    // The trigger handle_new_user() will create profile automatically
     // If email confirmation is disabled, we get a session immediately
     if (data.session) {
       setSession(data.session);
       setUser(data.session.user);
 
-      const userId = data.session.user.id;
+      // Refresh local state
+      const prof = await getCurrentProfile();
+      setProfile(prof);
+      if (prof) {
+        const char = await getCharacter(prof.id);
+        setCharacter(char);
+      }
 
-      try {
-        // Create profile with all required fields
-        const profileInsert = await supabase.from('profiles').insert({
-          id: userId,
-          username,
-          email,
-          province: province || null,
-          city: province || null,
-          is_admin: false,
-          is_super_admin: false,
-          is_event_publisher: false
-        });
-
-        if (profileInsert.error) {
-          console.error('Profile insert error:', profileInsert.error);
-        }
-
-        // Create user_settings
-        const settingsInsert = await supabase.from('user_settings').insert({
-          user_id: userId,
-          theme: 'dark',
-          notifications_enabled: true,
-          email_notifications: true,
-          show_province: true,
-          show_character: true,
-          language: 'pt'
-        });
-
-        if (settingsInsert.error) {
-          console.error('Settings insert error:', settingsInsert.error);
-        }
-
-        // Check if this is the first user -> make super admin
-        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-        if (count === 1) {
-          await supabase.from('profiles').update({ is_super_admin: true, is_admin: true }).eq('id', userId);
-        }
-
-        // Create default character if not exists
-        const { data: existingChar } = await supabase.from('characters').select('*').eq('user_id', userId).maybeSingle();
-        if (!existingChar) {
-          const characterInsert = await supabase.from('characters').insert({
-            user_id: userId,
-            name: username,
-            class: characterClass || 'ninja',
-            level: 1,
-            xp: 0,
-            hp: 100,
-            max_hp: 100,
-            attack: 10,
-            defense: 10,
-            speed: 10,
-            special: 10,
-            wins: 0,
-            losses: 0,
-            draws: 0
-          });
-
-          if (characterInsert.error) {
-            console.error('Character insert error:', characterInsert.error);
-          }
-        }
-
-        // Refresh local state
-        const prof = await getCurrentProfile();
-        setProfile(prof);
-        if (prof) {
-          const char = await getCharacter(prof.id);
-          setCharacter(char);
-        }
-      } catch (e) {
-        console.error('Error creating profile after signup:', e);
+      // Mark onboarding as not completed for new users
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('otakukamba-onboarding');
+      }
+    } else if (data.user && !data.session) {
+      // Email confirmation required - this is a new user who needs to confirm email
+      // Mark that they registered and need to confirm
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('otakukamba-pending-confirmation', 'true');
+        localStorage.removeItem('otakukamba-onboarding'); // Remove any previous onboarding state
       }
     }
 
-    return { error: null };
+    return { error: null, needsEmailConfirmation: !data.session && !!data.user };
   };
 
   const signIn = async (email: string, password: string) => {
