@@ -54,7 +54,7 @@ export default function CreateCharacterPage() {
 
       const stats = baseStats[selectedClass];
 
-      const { error: insertError } = await supabase.from('characters').insert({
+      const { error: upsertError } = await supabase.from('characters').upsert({
         user_id: user.id,
         name,
         class: selectedClass,
@@ -69,9 +69,9 @@ export default function CreateCharacterPage() {
         wins: 0,
         losses: 0,
         draws: 0,
-      });
+      }, { onConflict: 'user_id' });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
 
       showToast('Personagem criado com sucesso!', 'success');
       navigate('/dashboard');

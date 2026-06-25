@@ -77,6 +77,7 @@ export default function Footer() {
                 { path: '/stories', label: 'Stories' },
                 { path: '/groups', label: 'Grupos' },
                 { path: '/messages', label: 'Mensagens' },
+                { path: '/feedback', label: 'Feedback' },
               ].map(({ path, label }) => (
                 <li key={path}>
                   <Link
@@ -114,6 +115,11 @@ export default function Footer() {
               <li>
                 <Link to="/privacidade" className="text-sm text-text3 hover:text-text2 transition-colors">
                   Privacidade
+                </Link>
+              </li>
+              <li>
+                <Link to="/feedback" className="text-sm text-text3 hover:text-text2 transition-colors">
+                  Feedback
                 </Link>
               </li>
             </ul>

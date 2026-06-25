@@ -18,15 +18,16 @@ export default function HomePage() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const [{ count: warriors }, { count: duels }] = await Promise.all([
+        const [{ count: warriors }, { count: duels }, { count: online }] = await Promise.all([
           supabase.from('characters').select('*', { count: 'exact', head: true }),
-          supabase.from('duels').select('*', { count: 'exact', head: true })
+          supabase.from('duels').select('*', { count: 'exact', head: true }),
+          supabase.from('profiles').select('*', { count: 'exact', head: true })
         ]);
 
         setStats({
           warriors: warriors || 0,
           duels: duels || 0,
-          online: 0 // Would need realtime presence for this
+          online: online || 0
         });
       } catch {
         // Ignore errors for stats
@@ -107,13 +108,14 @@ export default function HomePage() {
           {/* Stats - Real Data */}
           <div className="flex justify-center border border-border rounded-2xl bg-white/2 backdrop-blur-sm overflow-hidden max-w-lg mx-auto animate-fade-up animate-delay-400">
             {[
+              { num: stats.online || '0', label: 'Online', live: true },
               { num: stats.warriors || '0', label: 'Guerreiros', live: true },
               { num: stats.duels || '0', label: 'Duelos', live: true },
               { num: '🇦🇴', label: 'Angola', live: false },
             ].map((stat, i) => (
               <div
                 key={stat.label}
-                className={`flex-1 py-5 px-6 text-center ${i < 2 ? 'border-r border-border' : ''}`}
+                className={`flex-1 py-5 px-6 text-center ${i < 3 ? 'border-r border-border' : ''}`}
               >
                 <div className="font-bebas text-3xl tracking-wide text-text">
                   {stat.num}

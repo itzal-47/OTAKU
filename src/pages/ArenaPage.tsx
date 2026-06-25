@@ -87,16 +87,27 @@ export default function ArenaPage() {
   const [filterLevel, setFilterLevel] = useState('all');
   const [animating, setAnimating] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const arenaChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (character) {
       loadArenaData();
+      if (arenaChannelRef.current) {
+        supabase.removeChannel(arenaChannelRef.current);
+        arenaChannelRef.current = null;
+      }
       const channel = supabase.channel('arena_updates');
+      arenaChannelRef.current = channel;
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'duels' }, () => {
         loadArenaData();
       });
       channel.subscribe();
-      return () => { supabase.removeChannel(channel); };
+      return () => {
+        if (arenaChannelRef.current) {
+          supabase.removeChannel(arenaChannelRef.current);
+          arenaChannelRef.current = null;
+        }
+      };
     }
   }, [character]);
 

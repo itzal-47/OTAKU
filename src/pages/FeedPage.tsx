@@ -56,17 +56,27 @@ export default function FeedPage() {
   const [editContent, setEditContent] = useState('');
   const feedEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     loadPosts();
-
+    // Clean up any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     const channel = supabase.channel('posts_feed');
+    channelRef.current = channel;
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
       loadPosts();
     });
     channel.subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, []);
 
   async function loadPosts() {

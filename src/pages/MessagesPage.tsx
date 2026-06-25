@@ -40,6 +40,7 @@ export default function MessagesPage() {
   const [creating, setCreating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   async function loadChats() {
     if (!user) return;
@@ -109,6 +110,10 @@ export default function MessagesPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     const channel = supabase
       .channel('private_messages_global')
       .on(
@@ -141,8 +146,12 @@ export default function MessagesPage() {
         }
       )
       .subscribe();
+    channelRef.current = channel;
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeChat]);

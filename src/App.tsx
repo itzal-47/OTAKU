@@ -31,6 +31,7 @@ import GroupsPage from './pages/GroupsPage';
 import GroupDetailPage from './pages/GroupDetailPage';
 import MessagesPage from './pages/MessagesPage';
 import AdminInboxPage from './pages/AdminInboxPage';
+import FeedbackPage from './pages/FeedbackPage';
 
 function App() {
   return (
@@ -66,6 +67,7 @@ function App() {
               <Route path="groups/:id" element={<GroupDetailPage />} />
               <Route path="messages" element={<MessagesPage />} />
               <Route path="inbox" element={<AdminInboxPage />} />
+              <Route path="feedback" element={<FeedbackPage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

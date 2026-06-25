@@ -37,14 +37,23 @@ export default function ChatPage() {
   const [joinRequests, setJoinRequests] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     loadRooms();
     if (user) {
       checkIsAdmin(user.id).then(setIsAdminUser);
     }
+  }, [user?.id]);
 
+  useEffect(() => {
+    // Cleanup existing realtime channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     const channel = supabase.channel('chat_messages');
+    channelRef.current = channel;
     channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
       const newMsg = payload.new as ChatMessage;
       if (selectedRoom && newMsg.room_id === selectedRoom.id) {
@@ -57,9 +66,13 @@ export default function ChatPage() {
       }
     });
     channel.subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id, selectedRoom?.id]);
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [selectedRoom?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +121,7 @@ export default function ChatPage() {
       loadRoomMembers();
       loadJoinRequests();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoom?.id, user?.id]);
 
   async function loadMessages() {

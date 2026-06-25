@@ -46,9 +46,27 @@ export default function StoriesPage() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     loadStories();
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    const channel = supabase.channel('stories_updates');
+    channelRef.current = channel;
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, () => {
+      loadStories();
+    });
+    channel.subscribe();
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, []);
 
   async function loadStories() {
@@ -138,7 +156,7 @@ export default function StoriesPage() {
     }
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/stories/${Date.now()}.${fileExt}`;
+    const filePath = `stories/${user.id}/${Date.now()}.${fileExt}`;
 
     setUploadingFile(true);
     try {

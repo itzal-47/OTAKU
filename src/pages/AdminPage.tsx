@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -85,11 +85,28 @@ export default function AdminPage() {
 
   const isAdmin = profile?.is_admin;
   const isSuperAdmin = profile?.is_super_admin;
+  const adminChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
       loadData();
     }
+    if (adminChannelRef.current) {
+      supabase.removeChannel(adminChannelRef.current);
+      adminChannelRef.current = null;
+    }
+    const channel = supabase.channel('admin_updates');
+    adminChannelRef.current = channel;
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'chat_room_requests' }, () => { loadData(); });
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'admin_requests' }, () => { loadData(); });
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => { loadData(); });
+    channel.subscribe();
+    return () => {
+      if (adminChannelRef.current) {
+        supabase.removeChannel(adminChannelRef.current);
+        adminChannelRef.current = null;
+      }
+    };
   }, [isAdmin]);
 
   async function loadData() {

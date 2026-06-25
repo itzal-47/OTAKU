@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap, MessageSquare, Users, Inbox } from 'lucide-react';
+import { Menu, X, Search, Zap, MessageSquare, Inbox } from 'lucide-react';
 import { useState } from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -87,6 +87,9 @@ export default function Navbar() {
           </>
         ) : isAuth ? null : (
           <>
+            <Link to="/feedback" className="text-sm text-text3 hover:text-text px-3 py-2 hidden lg:block">
+              Feedback
+            </Link>
             <Link to="/termos" className="text-sm text-text3 hover:text-text px-3 py-2 hidden lg:block">
               Termos
             </Link>
@@ -125,6 +128,7 @@ export default function Navbar() {
               { path: '/torneios', label: '🏅 Torneios' },
               { path: '/chat', label: '💬 Chat' },
               { path: '/search', label: '🔍 Busca' },
+              { path: '/feedback', label: '📝 Feedback' },
               { path: '/termos', label: '📄 Termos' },
               { path: '/ajuda', label: '❓ Ajuda' },
               { path: '/funcionalidades', label: '✨ Funcionalidades' },

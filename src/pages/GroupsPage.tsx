@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { Link } from 'react-router-dom';
@@ -51,6 +51,7 @@ export default function GroupsPage() {
   const [requestGroupId, setRequestGroupId] = useState<string | null>(null);
   const [requestMessage, setRequestMessage] = useState('');
   const [requestLoading, setRequestLoading] = useState(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   async function loadGroups() {
     setLoading(true);
@@ -90,6 +91,22 @@ export default function GroupsPage() {
 
   useEffect(() => {
     loadGroups();
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    const channel = supabase.channel('groups_updates');
+    channelRef.current = channel;
+    channel.on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
+      loadGroups();
+    });
+    channel.subscribe();
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 

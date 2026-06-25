@@ -86,6 +86,7 @@ export default function GroupDetailPage() {
   const [editRules, setEditRules] = useState(false);
   const [rulesForm, setRulesForm] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   async function loadData() {
     if (!id) return;
@@ -166,6 +167,10 @@ export default function GroupDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
     const channel = supabase
       .channel(`group_posts_${id}`)
       .on(
@@ -176,8 +181,12 @@ export default function GroupDetailPage() {
         }
       )
       .subscribe();
+    channelRef.current = channel;
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

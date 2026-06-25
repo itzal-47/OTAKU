@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
 import { supabase } from '../lib/supabase';
-import { User, Bell, Lock, Globe, Save, Eye, EyeOff, Trash2, Zap, HelpCircle, FileText } from 'lucide-react';
+import { User, Bell, Lock, Globe, Save, Eye, EyeOff, Trash2, Zap, HelpCircle, FileText, Sun, Moon } from 'lucide-react';
 import { ANGOLAN_PROVINCES } from '../types/index';
 
 export default function SettingsPage() {
@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'privacy' | 'notifications' | 'security' | 'features'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'privacy' | 'notifications' | 'security' | 'theme' | 'features'>('profile');
 
   // Profile settings
   const [username, setUsername] = useState('');
@@ -27,8 +27,10 @@ export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
 
+  // Theme
+  const [theme, setTheme] = useState('dark');
+
   // Security
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
@@ -55,6 +57,7 @@ export default function SettingsPage() {
         setShowCharacter(settings.show_character);
         setNotificationsEnabled(settings.notifications_enabled);
         setEmailNotifications(settings.email_notifications);
+        setTheme(settings.theme || 'dark');
       }
     } catch {
       // No settings yet
@@ -99,7 +102,8 @@ export default function SettingsPage() {
           show_province: showProvince,
           show_character: showCharacter,
           notifications_enabled: notificationsEnabled,
-          email_notifications: emailNotifications
+          email_notifications: emailNotifications,
+          theme: theme
         });
 
       if (error) throw error;
@@ -133,7 +137,6 @@ export default function SettingsPage() {
 
       if (error) throw error;
 
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       showToast('Palavra-passe atualizada!', 'success');
@@ -192,6 +195,7 @@ export default function SettingsPage() {
             { id: 'privacy', label: 'Privacidade', icon: Eye },
             { id: 'notifications', label: 'Notificações', icon: Bell },
             { id: 'security', label: 'Segurança', icon: Lock },
+            { id: 'theme', label: 'Tema', icon: theme === 'dark' ? Moon : Sun },
             { id: 'features', label: 'Funcionalidades', icon: Zap },
           ].map(tab => (
             <button
@@ -442,6 +446,58 @@ export default function SettingsPage() {
                 >
                   <Lock size={16} />
                   {saving ? 'Atualizando...' : 'Atualizar Palavra-passe'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Theme */}
+          {activeTab === 'theme' && (
+            <div className="bg-bg2 border border-border rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-purple/15 flex items-center justify-center">
+                  {theme === 'dark' ? <Moon className="text-purple" size={20} /> : <Sun className="text-purple" size={20} />}
+                </div>
+                <h2 className="font-rajdhani font-bold text-lg text-text">Tema</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${
+                      theme === 'dark'
+                        ? 'bg-purple/15 border-purple/30 text-purple2'
+                        : 'bg-bg3 border-border text-text2 hover:text-text'
+                    }`}
+                  >
+                    <Moon size={24} />
+                    <span className="text-sm font-semibold">Escuro</span>
+                  </button>
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${
+                      theme === 'light'
+                        ? 'bg-amber/15 border-amber/30 text-amber'
+                        : 'bg-bg3 border-border text-text2 hover:text-text'
+                    }`}
+                  >
+                    <Sun size={24} />
+                    <span className="text-sm font-semibold">Claro</span>
+                  </button>
+                </div>
+
+                <p className="text-xs text-text3">
+                  O tema escuro é o padrão da OtakuKamba. O tema claro está em desenvolvimento.
+                </p>
+
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={saving}
+                  className="btn btn-primary justify-center"
+                >
+                  <Save size={16} />
+                  Salvar Tema
                 </button>
               </div>
             </div>

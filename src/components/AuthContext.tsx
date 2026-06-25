@@ -104,59 +104,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setUser(data.session.user);
 
-      // Create profile immediately
-      (async () => {
-        try {
-          const userId = data.session!.user.id;
-          await supabase.from('profiles').insert({
-            id: userId,
-            username,
-            email,
-            is_admin: false,
-            is_super_admin: false,
-            is_event_publisher: false
-          });
-          // Create user_settings
-          await supabase.from('user_settings').insert({
-            user_id: userId,
-            theme: 'dark',
-            notifications_enabled: true,
-            email_notifications: true,
-            show_province: true,
-            show_character: true,
-            language: 'pt'
-          });
-          // Check if this is the first user -> make super admin
-          const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-          if (count === 1) {
-            await supabase.from('profiles').update({ is_super_admin: true, is_admin: true }).eq('id', userId);
-          }
-          // Create default character if not exists
-          const { data: existingChar } = await supabase.from('characters').select('*').eq('user_id', userId).maybeSingle();
-          if (!existingChar) {
-            await supabase.from('characters').insert({
-              user_id: userId,
-              name: username,
-              class: characterClass || 'ninja',
-              level: 1,
-              xp: 0,
-              hp: 100,
-              max_hp: 100,
-              attack: 10,
-              defense: 10,
-              speed: 10,
-              special: 10,
-              wins: 0,
-              losses: 0,
-              draws: 0
-            });
-          }
-          const prof = await getCurrentProfile();
-          setProfile(prof);
-        } catch (e) {
-          console.error('Error creating profile after signup:', e);
+      // Create profile immediately - await it properly
+      try {
+        const userId = data.session.user.id;
+        await supabase.from('profiles').insert({
+          id: userId,
+          username,
+          email,
+          is_admin: false,
+          is_super_admin: false,
+          is_event_publisher: false
+        });
+        // Create user_settings
+        await supabase.from('user_settings').insert({
+          user_id: userId,
+          theme: 'dark',
+          notifications_enabled: true,
+          email_notifications: true,
+          show_province: true,
+          show_character: true,
+          language: 'pt'
+        });
+        // Check if this is the first user -> make super admin
+        const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+        if (count === 1) {
+          await supabase.from('profiles').update({ is_super_admin: true, is_admin: true }).eq('id', userId);
         }
-      })();
+        // Create default character if not exists
+        const { data: existingChar } = await supabase.from('characters').select('*').eq('user_id', userId).maybeSingle();
+        if (!existingChar) {
+          await supabase.from('characters').insert({
+            user_id: userId,
+            name: username,
+            class: characterClass || 'ninja',
+            level: 1,
+            xp: 0,
+            hp: 100,
+            max_hp: 100,
+            attack: 10,
+            defense: 10,
+            speed: 10,
+            special: 10,
+            wins: 0,
+            losses: 0,
+            draws: 0
+          });
+        }
+        const prof = await getCurrentProfile();
+        setProfile(prof);
+        if (prof) {
+          const char = await getCharacter(prof.id);
+          setCharacter(char);
+        }
+      } catch (e) {
+        console.error('Error creating profile after signup:', e);
+      }
     }
 
     return { error: null };
