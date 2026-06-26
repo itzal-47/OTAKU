@@ -25,10 +25,29 @@ export default function StoriesBar() {
 
   async function loadStories() {
     try {
-      const { data: storiesData } = await supabase
+      // Get list of users that current user follows
+      let followingIds: string[] = [];
+      if (user) {
+        const { data: followsData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        followingIds = (followsData || []).map(f => f.following_id);
+        // Include own stories
+        followingIds.push(user.id);
+      }
+
+      let query = supabase
         .from('stories')
         .select('user_id')
         .gt('expires_at', new Date().toISOString());
+
+      // Filter by followed users (if logged in)
+      if (user && followingIds.length > 0) {
+        query = query.in('user_id', followingIds);
+      }
+
+      const { data: storiesData } = await query;
 
       if (!storiesData || storiesData.length === 0) {
         setStoryGroups([]);
@@ -41,7 +60,7 @@ export default function StoriesBar() {
       const [profilesData, viewsData] = await Promise.all([
         supabase.from('profiles').select('id, username').in('id', userIds),
         user
-          ? supabase.from('story_views').select('story_id').eq('viewer_id', user.id)
+          ? supabase.from('story_views').select('story_id').eq('user_id', user.id)
           : { data: [] }
       ]);
 

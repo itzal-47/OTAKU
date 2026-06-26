@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import StoriesBar from '../components/StoriesBar';
 import OnboardingScreen from '../components/OnboardingScreen';
+import CommunityHighlights from '../components/CommunityHighlights';
+import GuestCTA from '../components/GuestCTA';
 
 interface Stats {
   warriors: number;
@@ -18,17 +20,21 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    // Show onboarding for ALL new users (who haven't completed it)
+    // Show onboarding ONLY when user logs in (session-based)
     if (user && typeof window !== 'undefined') {
       const hasCompletedOnboarding = localStorage.getItem('otakukamba-onboarding');
-      const isNewUser = sessionStorage.getItem('otakukamba-new-user');
+      const justLoggedIn = sessionStorage.getItem('otakukamba-just-logged-in');
+      const justRegistered = sessionStorage.getItem('otakukamba-just-registered');
 
-      if (!hasCompletedOnboarding || isNewUser) {
-        // Mark as new session to show onboarding for new registrations
-        if (!hasCompletedOnboarding) {
-          sessionStorage.setItem('otakukamba-new-user', 'true');
-        }
+      // Show onboarding only for:
+      // 1. First time users who haven't completed onboarding
+      // 2. Users who just logged in this session
+      // 3. Users who just registered
+      if (!hasCompletedOnboarding || justLoggedIn === 'true' || justRegistered === 'true') {
         setShowOnboarding(true);
+        // Clear the session flags after showing once
+        sessionStorage.removeItem('otakukamba-just-logged-in');
+        sessionStorage.removeItem('otakukamba-just-registered');
       }
     }
   }, [user]);
@@ -352,6 +358,27 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Community Highlights */}
+      {user && (
+        <section className="border-t border-border">
+          <div className="section-inner">
+            <CommunityHighlights />
+          </div>
+        </section>
+      )}
+
+      {/* Guest CTA - Only for non-logged users */}
+      {!user && (
+        <section className="border-t border-border">
+          <div className="section-inner">
+            <GuestCTA
+              title="Juntas-te a Nós"
+              message="Faz login ou cria a tua conta agora para criar o teu personagem, entrar na arena e interagir com a comunidade otaku de Angola."
+            />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

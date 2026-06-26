@@ -147,8 +147,11 @@ export default function ClansPage() {
       return;
     }
 
-    if (!profile?.is_admin && !profile?.is_super_admin) {
-      showToast('Apenas admins podem criar clãs', 'error');
+    const profileData = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const isAdmin = profileData.data?.role === 'admin' || profileData.data?.role === 'super_admin';
+
+    if (!isAdmin) {
+      showToast('Apenas Admins e o Fundador podem criar clãs', 'error');
       return;
     }
 

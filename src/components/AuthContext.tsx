@@ -59,6 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
 
+      // Mark session as just logged in to trigger onboarding
+      if (event === 'SIGNED_IN' && session?.user) {
+        sessionStorage.setItem('otakukamba-just-logged-in', 'true');
+      }
+
       if (session?.user) {
         (async () => {
           const prof = await getCurrentProfile();

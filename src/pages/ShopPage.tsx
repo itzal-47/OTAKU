@@ -18,7 +18,64 @@ interface ShopItem {
   effect_type: string;
   effect_value: any;
   stock: number | null;
+  is_coming_soon?: boolean;
 }
+
+// Coming soon items (mocked, not in database yet)
+const COMING_SOON_ITEMS: ShopItem[] = [
+  {
+    id: 'coming-soon-1',
+    name: 'Pet Kurama',
+    description: 'Um mascote animado que te segue no perfil',
+    category: 'special',
+    icon: '🦊',
+    rarity: 'legendary',
+    xp_cost: 5000,
+    effect_type: 'mascot',
+    effect_value: { mascot: 'kurama' },
+    stock: null,
+    is_coming_soon: true,
+  },
+  {
+    id: 'coming-soon-2',
+    name: 'Transformação Super Saiyan',
+    description: 'Efeito visual especial durante duelos',
+    category: 'special',
+    icon: '⚡',
+    rarity: 'legendary',
+    xp_cost: 8000,
+    effect_type: 'transformation',
+    effect_value: { effect: 'ssj' },
+    stock: null,
+    is_coming_soon: true,
+  },
+  {
+    id: 'coming-soon-3',
+    name: 'Sharingan',
+    description: 'Olho especial que dá bónus em duelos',
+    category: 'special',
+    icon: '👁️',
+    rarity: 'epic',
+    xp_cost: 3000,
+    effect_type: 'ability',
+    effect_value: { ability: 'sharingan' },
+    stock: null,
+    is_coming_soon: true,
+  },
+  {
+    id: 'coming-soon-4',
+    name: 'Bankai',
+    description: 'Libertação completa do teu poder oculto',
+    category: 'special',
+    icon: '🗡️',
+    rarity: 'epic',
+    xp_cost: 4000,
+    effect_type: 'ability',
+    effect_value: { ability: 'bankai' },
+    stock: null,
+    is_coming_soon: true,
+  },
+];
 
 interface InventoryItem {
   id: string;
@@ -84,7 +141,7 @@ export default function ShopPage() {
           : { data: null },
       ]);
 
-      setItems(itemsRes.data || []);
+      setItems([...(itemsRes.data || []), ...COMING_SOON_ITEMS]);
       setInventory(inventoryRes.data || []);
       if (profileRes.data) {
         setUserXP(profileRes.data.total_xp || 0);
@@ -288,11 +345,19 @@ export default function ShopPage() {
               {filteredItems.map(item => (
                 <div
                   key={item.id}
-                  onClick={() => setShowItemModal(item)}
-                  className={`relative rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] border ${RARITY_BG[item.rarity]}`}
+                  onClick={() => !item.is_coming_soon && setShowItemModal(item)}
+                  className={`relative rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.02] border ${RARITY_BG[item.rarity]} ${item.is_coming_soon ? 'opacity-60' : ''}`}
                 >
+                  {/* Coming Soon Overlay */}
+                  {item.is_coming_soon && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-bg/80 backdrop-blur-sm">
+                      <Lock className="text-amber mb-2" size={32} />
+                      <span className="text-xs font-bold text-amber uppercase tracking-wider">Brevemente</span>
+                    </div>
+                  )}
+
                   {/* Rarity glow */}
-                  {item.rarity === 'legendary' && (
+                  {item.rarity === 'legendary' && !item.is_coming_soon && (
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-amber/5 via-amber/10 to-amber/5 animate-pulse" />
                   )}
 
@@ -317,7 +382,7 @@ export default function ShopPage() {
                         <Zap size={14} />
                         {item.xp_cost}
                       </div>
-                      {!canAfford(item) && (
+                      {!canAfford(item) && !item.is_coming_soon && (
                         <Lock className="text-red" size={14} />
                       )}
                     </div>

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
+import { useToast } from '../components/ToastContext';
+import { supabase } from '../lib/supabase';
 import {
   Book, ChevronRight, ChevronDown, Swords, Users, Trophy,
   Shield, Star, Zap, Gift, MessageCircle, Calendar, Target,
   ShoppingBag, Award, Crown, Lock, HelpCircle, ExternalLink,
-  Flame, Heart, Sparkles, MapPin, TrendingUp, Coins
+  Flame, Heart, Sparkles, MapPin, TrendingUp, Coins, X
 } from 'lucide-react';
 
 interface GuideSection {
@@ -321,10 +323,15 @@ const guideSections: GuideSection[] = [
 ];
 
 export default function GuidePage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const filteredSections = guideSections.filter(section =>
     section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -334,15 +341,67 @@ export default function GuidePage() {
     )
   );
 
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (password !== '@fofolindo16') {
+      showToast('Senha incorreta!', 'error');
+      setTimeout(() => setShowPasswordModal(false), 1500);
+      setPassword('');
+      return;
+    }
+
+    if (!user) {
+      showToast('Precisas estar logado!', 'error');
+      setShowPasswordModal(false);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Update profile to super_admin with title and verified
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          role: 'super_admin',
+          is_super_admin: true,
+          is_admin: true,
+          is_verified: true,
+          title: 'FUNDADOR',
+          title_color: 'gold'
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      showToast(`Seja bem-vindo, FUNDADOR!`, 'success');
+      setShowPasswordModal(false);
+
+      // Navigate to founder page
+      setTimeout(() => {
+        navigate('/fundador');
+      }, 1000);
+    } catch (error: any) {
+      showToast('Erro ao autenticar: ' + error.message, 'error');
+    } finally {
+      setLoading(false);
+      setPassword('');
+    }
+  }
+
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-teal/10 border border-teal/30 px-4 py-2 rounded-full text-xs font-semibold text-teal mb-4">
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            className="inline-flex items-center gap-2 bg-teal/10 border border-teal/30 px-4 py-2 rounded-full text-xs font-semibold text-teal mb-4 cursor-pointer hover:bg-teal/20 transition-all"
+          >
             <Book size={14} />
             Tutorial Completo
-          </div>
+          </button>
           <h1 className="font-bebas text-5xl text-text mb-3">Guia dos Kambas</h1>
           <p className="text-text3 max-w-lg mx-auto">
             Aprende tudo sobre o OtakuKamba: como jogar, subir de nível, criar clãs, duelos e muito mais.
@@ -502,6 +561,42 @@ export default function GuidePage() {
           ))}
         </div>
       </div>
+
+      {/* Password Modal for Terminal Access */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-bg2 border border-amber/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_60px_rgba(245,166,35,0.2)]">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Lock className="text-amber" size={24} />
+                <h2 className="font-rajdhani font-bold text-xl text-text">Terminal do Fundador</h2>
+              </div>
+              <button onClick={() => setShowPasswordModal(false)} className="text-text3 hover:text-text">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit}>
+              <label className="block text-sm text-text2 mb-2">Digite a senha de acesso:</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input mb-4"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={loading || !password}
+                className="btn w-full bg-amber text-bg hover:bg-amber/90 disabled:opacity-50"
+              >
+                {loading ? 'Verificando...' : 'Autenticar'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

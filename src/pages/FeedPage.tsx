@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Image, Video, Send, X, Clock, Trash2, Edit3 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Image, Video, Send, X, Clock, Trash2, Edit3, Loader2 } from 'lucide-react';
 import { CLASS_INFO, type CharacterClass } from '../types/index';
 import StoriesBar from '../components/StoriesBar';
+import GuestCTA from '../components/GuestCTA';
 
 interface Post {
   id: string;
@@ -42,6 +43,10 @@ export default function FeedPage() {
   const { showToast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const POSTS_PER_PAGE = 10;
   const [posting, setPosting] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMediaType, setNewPostMediaType] = useState<'none' | 'image' | 'video'>('none');
@@ -77,17 +82,47 @@ export default function FeedPage() {
         channelRef.current = null;
       }
     };
-  }, []);
+  }, [user]);
 
-  async function loadPosts() {
+  async function loadPosts(append: boolean = false) {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
     try {
-      const { data: postsData } = await supabase
+      // Get list of users that current user follows
+      let followingIds: string[] = [];
+      if (user) {
+        const { data: followsData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        followingIds = (followsData || []).map(f => f.following_id);
+        // Include own posts
+        followingIds.push(user.id);
+      }
+
+      const offset = append ? posts.length : 0;
+      let query = supabase
         .from('posts')
         .select('id, user_id, content, media_type, media_url, media_thumbnail, likes_count, comments_count, shares_count, created_at')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range(offset, offset + POSTS_PER_PAGE - 1);
+
+      // Filter by followed users (if logged in)
+      if (user && followingIds.length > 0) {
+        query = query.in('user_id', followingIds);
+      }
+
+      const { data: postsData } = await query;
 
       if (!postsData) return;
+
+      setHasMore(postsData.length === POSTS_PER_PAGE);
+
+      if (postsData.length === 0 && !append) {
+        setPosts([]);
+        return;
+      }
 
       const userIds = [...new Set(postsData.map(p => p.user_id))];
 
@@ -110,11 +145,22 @@ export default function FeedPage() {
         };
       });
 
-      setPosts(formattedPosts);
+      if (append) {
+        setPosts(prev => [...prev, ...formattedPosts]);
+      } else {
+        setPosts(formattedPosts);
+      }
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  }
+
+  function loadMorePosts() {
+    if (!loadingMore && hasMore) {
+      loadPosts(true);
     }
   }
 
@@ -396,11 +442,18 @@ export default function FeedPage() {
             <div className="w-12 h-12 border-2 border-border2 border-t-purple rounded-full animate-spin" />
           </div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
-            <div className="text-6xl mb-4">📰</div>
-            <h3 className="font-rajdhani font-bold text-xl text-text mb-2">Feed vazio</h3>
-            <p className="text-text3 text-sm">Sê o primeiro a publicar!</p>
-          </div>
+          !user ? (
+            <GuestCTA
+              title="Conteúdo Exclusivo"
+              message="Faz login ou cria a tua conta agora para ouvir músicas, interagir com os Kambas e criar o teu personagem."
+            />
+          ) : (
+            <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
+              <div className="text-6xl mb-4">📰</div>
+              <h3 className="font-rajdhani font-bold text-xl text-text mb-2">Feed vazio</h3>
+              <p className="text-text3 text-sm">Segue outros kambas ou sê o primeiro a publicar!</p>
+            </div>
+          )
         ) : (
           <div className="space-y-4">
             {posts.map(post => (
@@ -585,6 +638,27 @@ export default function FeedPage() {
                 )}
               </div>
             ))}
+
+            {/* Load More Button */}
+            {hasMore && posts.length > 0 && (
+              <div className="flex justify-center py-6">
+                <button
+                  onClick={loadMorePosts}
+                  disabled={loadingMore}
+                  className="btn btn-ghost flex items-center gap-2"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      A carregar...
+                    </>
+                  ) : (
+                    'Carregar mais'
+                  )}
+                </button>
+              </div>
+            )}
+
             <div ref={feedEndRef} />
           </div>
         )}

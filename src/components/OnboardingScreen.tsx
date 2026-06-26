@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 
 interface OnboardingSlide {
@@ -9,69 +9,76 @@ interface OnboardingSlide {
   bgAnimated?: string;
 }
 
-const slides: OnboardingSlide[] = [
-  {
-    title: "Bem-vindo ao OtakuKamba",
-    subtitle: "A plataforma feita por angolanos, para angolanos",
-    character: "🌸",
-    background: "from-purple-950 via-bg to-purple-900",
-    bgAnimated: "animate-pulse-slow"
-  },
-  {
-    title: "Duelos Épicos",
-    subtitle: "Escolhe a tua classe, treina o teu personagem e desafia outros otakus na arena",
-    character: "⚔️",
-    background: "from-red-950 via-bg to-red-900"
-  },
-  {
-    title: "Itachi Uchiha",
-    subtitle: "\"As pessoas vivem conectadas pelas escolhas que fazem...\"",
-    character: "🥷",
-    background: "from-gray-900 via-bg to-purple-950"
-  },
-  {
-    title: "Goku",
-    subtitle: "\"Eu sou o guerreiro mais forte do universo!\"",
-    character: "🔥",
-    background: "from-orange-950 via-bg to-red-900"
-  },
-  {
-    title: "Madara Uchiha",
-    subtitle: "\"O mundo é cruel. Mas também muito lindo.\"",
-    character: "🌙",
-    background: "from-purple-950 via-bg to-gray-900"
-  },
-  {
-    title: "Monkey D. Luffy",
-    subtitle: "\"Eu vou ser o Rei dos Piratas!\"",
-    character: "🏴‍☠️",
-    background: "from-red-950 via-bg to-orange-900"
-  },
-  {
-    title: "Naruto Uzumaki",
-    subtitle: "\"Eu nunca vou desistir! Essa é a minha ninja way!\"",
-    character: "🌀",
-    background: "from-orange-900 via-bg to-purple-950"
-  },
-  {
-    title: "Comunidade",
-    subtitle: "Feed, Stories, Grupos, Eventos - junta-te à família",
-    character: "👥",
-    background: "from-teal-950 via-bg to-purple-900"
-  },
-  {
-    title: "Estás pronto?",
-    subtitle: "O teu destino espera. A arena aguarda o teu nome.",
-    character: "🗡️",
-    background: "from-amber-950 via-bg to-red-900"
-  }
+// All possible quotes and characters for randomization
+const allQuotes = [
+  { character: "🥷", title: "Itachi Uchiha", quote: "As pessoas vivem conectadas pelas escolhas que fazem..." },
+  { character: "🔥", title: "Goku", quote: "Eu sou o guerreiro mais forte do universo!" },
+  { character: "🌙", title: "Madara Uchiha", quote: "O mundo é cruel. Mas também muito lindo." },
+  { character: "🏴‍☠️", title: "Monkey D. Luffy", quote: "Eu vou ser o Rei dos Piratas!" },
+  { character: "🌀", title: "Naruto Uzumaki", quote: "Eu nunca vou desistir! Essa é a minha ninja way!" },
+  { character: "⚔️", title: "Zoro", quote: "Quando decidi seguir um caminho, nunca me virei atrás." },
+  { character: "💀", title: "Light Yagami", quote: "O mundo está podre, e precisa ser limpo." },
+  { character: "👹", title: "Eren Yeager", quote: "Se não lutar, não podes vencer." },
+  { character: "⚡", title: "Naruto", quote: "Acredita em ti mesmo!" },
+  { character: "🗡️", title: "Tanjiro", quote: "Não desista. Mesmo que seja duro, continue em frente!" },
 ];
+
+const backgrounds = [
+  "from-purple-950 via-bg to-purple-900",
+  "from-red-950 via-bg to-red-900",
+  "from-gray-900 via-bg to-purple-950",
+  "from-orange-950 via-bg to-red-900",
+  "from-teal-950 via-bg to-purple-900",
+  "from-amber-950 via-bg to-red-900",
+];
+
+function getRandomizedSlides(): OnboardingSlide[] {
+  const shuffledQuotes = [...allQuotes].sort(() => Math.random() - 0.5);
+  const selectedQuotes = shuffledQuotes.slice(0, 5);
+
+  const quoteSlides: OnboardingSlide[] = selectedQuotes.map((q, i) => ({
+    title: q.title,
+    subtitle: `"${q.quote}"`,
+    character: q.character,
+    background: backgrounds[i % backgrounds.length],
+  }));
+
+  return [
+    {
+      title: "Bem-vindo ao OtakuKamba",
+      subtitle: "A plataforma feita por angolanos, para angolanos",
+      character: "🌸",
+      background: "from-purple-950 via-bg to-purple-900",
+    },
+    {
+      title: "Duelos Épicos",
+      subtitle: "Escolhe a tua classe, treina o teu personagem e desafia outros otakus na arena",
+      character: "⚔️",
+      background: "from-red-950 via-bg to-red-900",
+    },
+    ...quoteSlides,
+    {
+      title: "Comunidade",
+      subtitle: "Feed, Stories, Grupos, Eventos - junta-te à família",
+      character: "👥",
+      background: "from-teal-950 via-bg to-purple-900",
+    },
+    {
+      title: "Estás pronto?",
+      subtitle: "O teu destino espera. A arena aguarda o teu nome.",
+      character: "🗡️",
+      background: "from-amber-950 via-bg to-red-900",
+    },
+  ];
+}
 
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  // Randomize slides once on mount
+  const slides = useMemo(() => getRandomizedSlides(), []);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
   const [fadeClass, setFadeClass] = useState('opacity-0 translate-y-4');

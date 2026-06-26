@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
-import { CLASS_INFO, type CharacterClass, type UserBadge, type Badge } from '../types/index';
-import { Trophy, Swords, TrendingUp, Clock, Medal, Crown, Users, Award, Shield, MessageSquare } from 'lucide-react';
+import { CLASS_INFO, type CharacterClass, type UserBadge, type Badge, type UserProfile } from '../types/index';
+import { Trophy, Swords, TrendingUp, Clock, Medal, Crown, Users, Award, Shield, MessageSquare, Star, Copy, Check } from 'lucide-react';
 import FollowButton from '../components/FollowButton';
 
 export default function ProfilePage() {
   const { username } = useParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ id: string; username: string; city?: string; province?: string; created_at: string } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [character, setCharacter] = useState<{
     id: string;
     name: string;
@@ -33,6 +33,7 @@ export default function ProfilePage() {
   const [followingCount, setFollowingCount] = useState(0);
   const [userBadges, setUserBadges] = useState<(UserBadge & { badge: Badge })[]>([]);
   const [clanInfo, setClanInfo] = useState<{ name: string; tag: string; role: string } | null>(null);
+  const [copiedId, setCopiedId] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -43,7 +44,7 @@ export default function ProfilePage() {
     try {
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('id, username, city, province, created_at')
+        .select('id, username, city, province, created_at, is_verified, role, title, title_color')
         .eq('username', username)
         .single();
 
@@ -141,6 +142,14 @@ export default function ProfilePage() {
   const totalMatches = character ? character.wins + character.losses + character.draws : 0;
   const winRate = totalMatches > 0 ? ((character?.wins || 0) / totalMatches) * 100 : 0;
 
+  function copyUserId() {
+    if (profile?.id) {
+      navigator.clipboard.writeText(profile.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
+  }
+
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -163,14 +172,46 @@ export default function ProfilePage() {
 
               {/* Info */}
               <div className="flex-1 pt-4 md:pt-0">
-                <div className="flex items-center gap-3 mb-1">
+                <div className="flex items-center gap-3 mb-1 flex-wrap">
                   <h1 className="font-bebas text-3xl text-text">{profile.username}</h1>
+
+                  {/* Title (FUNDADOR) */}
+                  {profile.title && (
+                    <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
+                      profile.title_color === 'gold'
+                        ? 'bg-gradient-to-r from-amber via-yellow to-amber text-bg animate-pulse shadow-[0_0_15px_rgba(245,166,35,0.5)]'
+                        : 'bg-purple/20 text-purple'
+                    }`}>
+                      {profile.title}
+                    </span>
+                  )}
+
+                  {/* Verified Badge */}
+                  {profile.is_verified && (
+                    <span className="inline-flex items-center gap-1 text-teal">
+                      <Shield size={16} />
+                    </span>
+                  )}
+
                   {rank && rank <= 3 && (
                     <span className="text-xl">
                       {rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'}
                     </span>
                   )}
                 </div>
+
+                {/* User ID */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-text3">ID: {profile.id.substring(0, 8)}...</span>
+                  <button
+                    onClick={copyUserId}
+                    className="text-text3 hover:text-purple transition-colors"
+                    title="Copiar ID completo"
+                  >
+                    {copiedId ? <Check size={14} className="text-teal" /> : <Copy size={14} />}
+                  </button>
+                </div>
+
                 <div className="flex flex-wrap items-center gap-3 text-sm text-text3">
                   {character && (
                     <>

@@ -45,8 +45,11 @@ export default function StoriesPage() {
   const [creating, setCreating] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadedMediaUrl, setUploadedMediaUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadStories();
@@ -66,17 +69,39 @@ export default function StoriesPage() {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
     };
-  }, []);
+  }, [user]);
 
   async function loadStories() {
     setLoading(true);
     try {
-      const { data: storiesData } = await supabase
+      // Get list of users that current user follows
+      let followingIds: string[] = [];
+      if (user) {
+        const { data: followsData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        followingIds = (followsData || []).map(f => f.following_id);
+        // Include own stories
+        followingIds.push(user.id);
+      }
+
+      let query = supabase
         .from('stories')
         .select('id, user_id, media_url, media_type, thumbnail_url, views_count, created_at, expires_at')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false });
+
+      // Filter by followed users (if logged in)
+      if (user && followingIds.length > 0) {
+        query = query.in('user_id', followingIds);
+      }
+
+      const { data: storiesData } = await query;
 
       if (!storiesData || storiesData.length === 0) {
         setStoryGroups([]);
@@ -134,7 +159,7 @@ export default function StoriesPage() {
 
     await supabase.from('story_views').insert({
       story_id: storyId,
-      viewer_id: user.id
+      user_id: user.id
     });
 
     setStoryGroups(prev => prev.map(group => ({
@@ -212,6 +237,7 @@ export default function StoriesPage() {
   function openStoryGroup(groupIndex: number) {
     setActiveGroupIndex(groupIndex);
     setActiveStoryIndex(0);
+    setProgress(0);
     const group = storyGroups[groupIndex];
     handleViewStory(group.stories[0].id);
   }
@@ -222,10 +248,12 @@ export default function StoriesPage() {
 
     if (activeStoryIndex < group.stories.length - 1) {
       setActiveStoryIndex(activeStoryIndex + 1);
+      setProgress(0);
       handleViewStory(group.stories[activeStoryIndex + 1].id);
     } else if (activeGroupIndex < storyGroups.length - 1) {
       setActiveGroupIndex(activeGroupIndex + 1);
       setActiveStoryIndex(0);
+      setProgress(0);
       handleViewStory(storyGroups[activeGroupIndex + 1].stories[0].id);
     } else {
       setActiveGroupIndex(null);
@@ -237,11 +265,48 @@ export default function StoriesPage() {
 
     if (activeStoryIndex > 0) {
       setActiveStoryIndex(activeStoryIndex - 1);
+      setProgress(0);
     } else if (activeGroupIndex > 0) {
       setActiveGroupIndex(activeGroupIndex - 1);
       setActiveStoryIndex(storyGroups[activeGroupIndex - 1].stories.length - 1);
+      setProgress(0);
     }
   }
+
+  // Auto-play functionality
+  useEffect(() => {
+    if (activeGroupIndex === null) {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      return;
+    }
+
+    const group = storyGroups[activeGroupIndex];
+    const story = group?.stories[activeStoryIndex];
+    if (!story) return;
+
+    // Duration: 5 seconds for images, video duration for videos
+    const duration = story.media_type === 'video' ? 10000 : 5000;
+    const interval = 50; // Update every 50ms for smooth progress
+    const increment = (interval / duration) * 100;
+
+    progressIntervalRef.current = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          nextStory();
+          return 0;
+        }
+        return prev + increment;
+      });
+    }, interval);
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [activeGroupIndex, activeStoryIndex, storyGroups]);
 
   if (loading) {
     return (
@@ -313,7 +378,10 @@ export default function StoriesPage() {
         {activeGroupIndex !== null && (
           <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
             <button
-              onClick={() => setActiveGroupIndex(null)}
+              onClick={() => {
+                setActiveGroupIndex(null);
+                setProgress(0);
+              }}
               className="absolute top-4 right-4 z-10 text-white hover:text-text2"
             >
               <X size={28} />
@@ -333,12 +401,19 @@ export default function StoriesPage() {
               <ChevronRight size={32} />
             </button>
 
-            <div className="w-full max-w-sm mx-4 aspect-[9/16] relative rounded-2xl overflow-hidden bg-black">
+            <div className="w-full max-w-md md:max-w-lg mx-4 aspect-[9/16] relative rounded-2xl overflow-hidden bg-black">
               <div className="absolute top-2 left-2 right-2 flex gap-1 z-10">
                 {storyGroups[activeGroupIndex].stories.map((s, idx) => (
                   <div key={s.id} className="flex-1 h-1 rounded-full bg-white/30 overflow-hidden">
                     <div
-                      className={`h-full bg-white ${idx < activeStoryIndex ? 'w-full' : idx === activeStoryIndex ? 'w-full animate-progress' : 'w-0'}`}
+                      className="h-full bg-white transition-all"
+                      style={{
+                        width: idx < activeStoryIndex
+                          ? '100%'
+                          : idx === activeStoryIndex
+                            ? `${progress}%`
+                            : '0%'
+                      }}
                     />
                   </div>
                 ))}
@@ -366,15 +441,18 @@ export default function StoriesPage() {
                 <img
                   src={storyGroups[activeGroupIndex].stories[activeStoryIndex].media_url}
                   alt=""
-                  className="absolute inset-0 w-full h-full object-contain"
+                  className="absolute inset-0 w-full h-full object-cover"
                   onClick={nextStory}
                 />
               ) : (
                 <video
+                  ref={videoRef}
                   src={storyGroups[activeGroupIndex].stories[activeStoryIndex].media_url}
                   autoPlay
-                  controls
-                  className="absolute inset-0 w-full h-full object-contain"
+                  muted
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onEnded={nextStory}
                 />
               )}
             </div>

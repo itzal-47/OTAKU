@@ -42,6 +42,9 @@ import WikiPage from './pages/WikiPage';
 import ShopPage from './pages/ShopPage';
 import GuidePage from './pages/GuidePage';
 import AchievementsPage from './pages/AchievementsPage';
+import FounderPage from './pages/FounderPage';
+import BazarPage from './pages/BazarPage';
+import AnimeSchedulePage from './pages/AnimeSchedulePage';
 
 function App() {
   return (
@@ -88,6 +91,9 @@ function App() {
               <Route path="loja" element={<ShopPage />} />
               <Route path="guia" element={<GuidePage />} />
               <Route path="conquistas" element={<AchievementsPage />} />
+              <Route path="fundador" element={<FounderPage />} />
+              <Route path="bazar" element={<BazarPage />} />
+              <Route path="calendario-anime" element={<AnimeSchedulePage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

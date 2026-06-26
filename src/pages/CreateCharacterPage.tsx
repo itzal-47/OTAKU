@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
@@ -10,28 +10,39 @@ export default function CreateCharacterPage() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [checkingCharacter, setCheckingCharacter] = useState(true);
+  const [hasCharacter, setHasCharacter] = useState(false);
   const [step, setStep] = useState<'name' | 'class' | 'confirm'>('name');
   const [name, setName] = useState('');
   const [selectedClass, setSelectedClass] = useState<CharacterClass>('ninja');
 
   const classInfo = CLASS_INFO[selectedClass];
 
+  useEffect(() => {
+    if (user) {
+      checkExistingCharacter();
+    }
+  }, [user]);
+
+  async function checkExistingCharacter() {
+    setCheckingCharacter(true);
+    const { data: existingChar } = await supabase
+      .from('characters')
+      .select('*')
+      .eq('user_id', user!.id)
+      .maybeSingle();
+
+    if (existingChar) {
+      setHasCharacter(true);
+      setName(existingChar.name);
+      setSelectedClass(existingChar.class as CharacterClass);
+    }
+    setCheckingCharacter(false);
+  }
+
   const handleCreate = async () => {
     if (!user) {
       navigate('/login');
-      return;
-    }
-
-    // Check if already has a character
-    const { data: existingChar } = await supabase
-      .from('characters')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (existingChar) {
-      showToast('Já tens um personagem!', 'error');
-      navigate('/dashboard');
       return;
     }
 
@@ -74,6 +85,13 @@ export default function CreateCharacterPage() {
       if (upsertError) throw upsertError;
 
       showToast('Personagem criado com sucesso!', 'success');
+
+      // Mark onboarding as completed for this session
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('otakukamba-onboarding', 'done');
+        sessionStorage.setItem('otakukamba-just-registered', 'true');
+      }
+
       navigate('/dashboard');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao criar personagem';
@@ -89,6 +107,30 @@ export default function CreateCharacterPage() {
         <div className="text-center">
           <h1 className="font-bebas text-4xl text-text mb-4">Precisas de uma conta</h1>
           <Link to="/login" className="btn btn-primary btn-lg">Entrar</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (checkingCharacter) {
+    return (
+      <div className="min-h-screen flex items-center justify-center pt-16 px-4">
+        <div className="w-14 h-14 border-2 border-border2 border-t-purple rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // If already has character, allow to customize
+  if (hasCharacter && step === 'confirm') {
+    return (
+      <div className="min-h-screen flex items-center justify-center pt-16 px-4">
+        <div className="max-w-md w-full text-center">
+          <h1 className="font-bebas text-4xl text-text mb-4">Personagem Existente</h1>
+          <p className="text-text2 mb-6">Já tens um personagem: <strong className="text-purple">{name}</strong> ({selectedClass})</p>
+          <div className="flex gap-4 justify-center">
+            <button onClick={() => setStep('name')} className="btn btn-ghost">Customizar</button>
+            <button onClick={() => navigate('/dashboard')} className="btn btn-primary">Ir ao Dashboard</button>
+          </div>
         </div>
       </div>
     );

@@ -426,7 +426,7 @@ export default function ArenaPage() {
     try {
       const { error } = await supabase
         .from('duels')
-        .delete()
+        .update({ status: 'cancelled' })
         .eq('id', duelId)
         .eq('challenger_id', user.id);
       if (error) throw error;

@@ -61,9 +61,13 @@ export interface UserProfile {
   city?: string;
   province?: string;
   country?: string;
-  is_admin: boolean;
-  is_super_admin: boolean;
-  is_event_publisher: boolean;
+  is_admin?: boolean;
+  is_super_admin?: boolean;
+  is_event_publisher?: boolean;
+  is_verified?: boolean;
+  role?: 'user' | 'admin' | 'super_admin';
+  title?: string;
+  title_color?: string;
   created_at: string;
   updated_at?: string;
 }

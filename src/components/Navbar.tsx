@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy } from 'lucide-react';
+import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy, Crown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -137,6 +137,13 @@ export default function Navbar() {
                   <BookOpen size={16} /> Guia dos Kambas
                 </Link>
                 <Link
+                  to="/fundador"
+                  onClick={() => setHamburgerOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/fundador') ? 'text-amber' : 'text-text2'}`}
+                >
+                  <Crown size={16} className="text-amber" /> FUNDADOR
+                </Link>
+                <Link
                   to="/conquistas"
                   onClick={() => setHamburgerOpen(false)}
                   className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-bg3 ${isActive('/conquistas') ? 'text-purple2' : 'text-text2'}`}
@@ -262,7 +269,10 @@ export default function Navbar() {
               { path: '/watchlist', label: '📺 Watchlist' },
               { path: '/wiki', label: '📚 Wiki' },
               { path: '/loja', label: '🛒 Loja do Kamba' },
+              { path: '/bazar', label: '🛍️ Bazar' },
+              { path: '/calendario-anime', label: '📅 Calendário Anime' },
               { path: '/guia', label: '📖 Guia dos Kambas' },
+              { path: '/fundador', label: '👑 FUNDADOR' },
               { path: '/conquistas', label: '🏆 Conquistas' },
               { path: '/quests', label: '⚡ Missões' },
               { path: '/badges', label: '🏅 Badges' },

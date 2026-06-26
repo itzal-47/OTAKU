@@ -99,15 +99,20 @@ export default function FanArtPage() {
   }
 
   async function handleSubmit() {
-    if (!user || !newArt.title.trim() || !newArt.image_url) {
-      showToast('Preenche todos os campos', 'error');
+    if (!user) {
+      showToast('Precisas estar logado', 'error');
+      return;
+    }
+
+    if (!newArt.image_url) {
+      showToast('Seleciona uma imagem', 'error');
       return;
     }
 
     try {
       await supabase.from('fan_art').insert({
         user_id: user.id,
-        title: newArt.title.trim(),
+        title: newArt.title.trim() || 'Fan Art',
         description: newArt.description.trim() || null,
         image_url: newArt.image_url
       });
