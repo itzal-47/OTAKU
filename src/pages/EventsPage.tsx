@@ -11,7 +11,7 @@ export default function EventsPage() {
   const { showToast } = useToast();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<'all' | 'online' | 'presencial'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'online' | 'presencial' | 'decorrer'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const canPublish = profile?.is_event_publisher || profile?.is_admin;
 
@@ -22,13 +22,22 @@ export default function EventsPage() {
   async function loadEvents() {
     setLoading(true);
     try {
+      const now = new Date();
       let query = supabase
         .from('events')
         .select('*')
-        .gte('event_date', new Date().toISOString())
         .order('event_date', { ascending: true });
 
-      if (filterType !== 'all') {
+      if (filterType === 'decorrer') {
+        // Eventos a decorrer: começaram mas ainda não acabaram
+        // Assumindo que eventos duram ~4h por padrão
+        query = query.lte('event_date', now.toISOString());
+      } else {
+        // Eventos futuros
+        query = query.gte('event_date', now.toISOString());
+      }
+
+      if (filterType === 'online' || filterType === 'presencial') {
         query = query.eq('type', filterType);
       }
 
@@ -67,6 +76,7 @@ export default function EventsPage() {
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {[
             { id: 'all', label: '🌟 Todos', icon: Filter },
+            { id: 'decorrer', label: '🔴 A Decorrer', icon: Calendar },
             { id: 'online', label: '🔵 Online', icon: Video },
             { id: 'presencial', label: '📍 Presencial', icon: MapPin },
           ].map(tab => (

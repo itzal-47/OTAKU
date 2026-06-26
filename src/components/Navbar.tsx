@@ -239,6 +239,7 @@ export default function Navbar() {
               { path: '/rankings', label: '🏆 Rankings' },
               { path: '/clas', label: '🛡️ Clãs' },
               { path: '/torneios', label: '🏅 Torneios' },
+              { path: '/eventos', label: '📅 Eventos' },
               { path: '/chat', label: '💬 Chat' },
               { path: '/search', label: '🔍 Busca' },
               { path: '/feedback', label: '📝 Feedback' },

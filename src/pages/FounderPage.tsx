@@ -220,7 +220,7 @@ export default function FounderPage() {
             { icon: Zap, label: 'Visão', value: 'Inovação' },
             { icon: Heart, label: 'Missão', value: 'Unir Otakus' },
             { icon: Award, label: 'Status', value: 'Fundador' },
-            { icon: Star, label: 'Desde', value: '2024' },
+            { icon: Star, label: 'Desde', value: '2026' },
           ].map((stat, i) => (
             <div key={i} className="bg-bg2 border border-border rounded-xl p-4 text-center">
               <stat.icon className="mx-auto text-amber mb-2" size={20} />
