@@ -11,10 +11,10 @@ const USER_COLORS = ['purple2', 'red2', 'teal', 'amber', 'purple'];
 async function checkIsAdmin(userId: string): Promise<boolean> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_admin, is_event_publisher')
+    .select('role, is_admin')
     .eq('id', userId)
     .single();
-  return profile?.is_admin || profile?.is_event_publisher || false;
+  return profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin' || profile?.is_admin || false;
 }
 
 export default function ChatPage() {
@@ -294,7 +294,7 @@ export default function ChatPage() {
   };
 
   const isAdmin = userMembership?.role === 'admin' || userMembership?.role === 'owner';
-  const canCreateRoom = isAdminUser || profile?.is_admin || false;
+  const canCreateRoom = isAdminUser || profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin' || profile?.is_admin || false;
   const isMember = !!userMembership;
   const hasPendingRequest = joinRequests.includes(selectedRoom?.id || '');
 

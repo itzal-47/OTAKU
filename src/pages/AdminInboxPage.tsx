@@ -96,7 +96,7 @@ export default function AdminInboxPage() {
   }, []);
 
   useEffect(() => {
-    if (user && profile?.is_super_admin) {
+    if (user && (profile?.is_super_admin || profile?.role === 'supreme_admin')) {
       loadInbox();
       loadRequests();
       setLoading(false);
@@ -129,7 +129,7 @@ export default function AdminInboxPage() {
     );
   }
 
-  if (!profile?.is_super_admin) {
+  if (!(profile?.is_super_admin || profile?.role === 'supreme_admin')) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-16">
         <div className="text-center">

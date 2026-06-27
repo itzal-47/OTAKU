@@ -123,7 +123,7 @@ export default function TournamentsPage() {
 
   async function handleCreateTournament(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !profile?.is_admin) {
+    if (!user || !(profile?.is_admin || profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin')) {
       showToast('Apenas admins podem criar e anunciar torneios', 'error');
       return;
     }
@@ -486,7 +486,7 @@ export default function TournamentsPage() {
             <h1 className="font-bebas text-4xl text-text">Torneios</h1>
             <p className="text-text3 text-sm">Prova o teu valor nos grandes campeonatos</p>
           </div>
-          {profile?.is_admin && (
+          {(profile?.is_admin || profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin') && (
             <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
               <Plus size={18} />
               Criar Torneio

@@ -148,10 +148,11 @@ export default function ClansPage() {
     }
 
     const profileData = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    const isAdmin = profileData.data?.role === 'admin' || profileData.data?.role === 'super_admin';
+    const isSupremeAdmin = profileData.data?.role === 'supreme_admin';
+    const isSecondaryAdmin = profileData.data?.role === 'secondary_admin';
 
-    if (!isAdmin) {
-      showToast('Apenas Admins e o Fundador podem criar clãs', 'error');
+    if (!isSupremeAdmin && !isSecondaryAdmin) {
+      showToast('Apenas Admins podem criar clãs', 'error');
       return;
     }
 
@@ -165,6 +166,9 @@ export default function ClansPage() {
       return;
     }
 
+    // Supreme admin creates approved clans instantly; secondary admin needs approval
+    const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
+
     try {
       const { data: clanData, error: clanError } = await supabase
         .from('clans')
@@ -177,24 +181,31 @@ export default function ClansPage() {
           clan_level: 1,
           clan_xp: 0,
           weekly_contribution: 0,
+          status: clanStatus,
         })
         .select()
         .single();
 
       if (clanError) throw clanError;
 
-      await supabase.from('clan_members').insert({
-        clan_id: clanData.id,
-        user_id: user.id,
-        role: 'leader',
-      });
+      // Only add member and update count if approved
+      if (clanStatus === 'approved') {
+        await supabase.from('clan_members').insert({
+          clan_id: clanData.id,
+          user_id: user.id,
+          role: 'leader',
+        });
 
-      await supabase
-        .from('clans')
-        .update({ total_members: 1 })
-        .eq('id', clanData.id);
+        await supabase
+          .from('clans')
+          .update({ total_members: 1 })
+          .eq('id', clanData.id);
 
-      showToast('Clã criado com sucesso!', 'success');
+        showToast('Clã criado e activado!', 'success');
+      } else {
+        showToast('Clã criado! Aguardando aprovação do Supreme Admin.', 'info');
+      }
+
       setShowCreateModal(false);
       setCreateForm({ name: '', tag: '', description: '', min_level: 1 });
       loadClans();
@@ -438,7 +449,7 @@ export default function ClansPage() {
             <h1 className="font-bebas text-4xl text-text">Clãs</h1>
             <p className="text-text3 text-sm">Une forças com outros guerreiros e domina o ranking</p>
           </div>
-          {user && character && !myClan && (profile?.is_admin || profile?.is_super_admin) && (
+          {user && character && !myClan && (profile?.is_admin || profile?.role === 'secondary_admin' || profile?.role === 'supreme_admin') && (
             <button onClick={() => setShowCreateModal(true)} className="btn btn-primary flex items-center gap-2">
               <Plus size={18} />
               Criar Clã

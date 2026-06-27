@@ -13,7 +13,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | 'online' | 'presencial' | 'decorrer'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const canPublish = profile?.is_event_publisher || profile?.is_admin;
+  const canPublish = profile?.is_event_publisher || profile?.is_admin || profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin';
 
   useEffect(() => {
     loadEvents();

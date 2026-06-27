@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
-import { Shield, Users, Check, X, Plus, Trash2, MessageCircle, Calendar, AlertTriangle, Flag, Crown } from 'lucide-react';
+import { Shield, Users, Check, X, Plus, Trash2, MessageCircle, Calendar, AlertTriangle, Flag, Crown, ShieldCheck } from 'lucide-react';
 import type { CharacterClass } from '../types/index';
 
 interface ChatRoomRequest {
@@ -71,20 +71,32 @@ interface ReportItem {
   reported_user?: { id: string; username: string };
 }
 
+interface PendingClan {
+  id: string;
+  name: string;
+  tag: string;
+  description?: string;
+  leader_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  leader?: { id: string; username: string };
+}
+
 export default function AdminPage() {
   const { user, profile } = useAuth();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'requests' | 'admins' | 'publishers' | 'reports' | 'admin_requests'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'admins' | 'publishers' | 'reports' | 'admin_requests' | 'clans'>('requests');
   const [roomRequests, setRoomRequests] = useState<ChatRoomRequest[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
+  const [pendingClans, setPendingClans] = useState<PendingClan[]>([]);
   const [loading, setLoading] = useState(true);
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
 
-  const isAdmin = profile?.is_admin;
-  const isSuperAdmin = profile?.is_super_admin;
+  const isAdmin = profile?.is_admin || profile?.role === 'secondary_admin' || profile?.role === 'supreme_admin';
+  const isSuperAdmin = profile?.is_super_admin || profile?.role === 'supreme_admin';
   const adminChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
@@ -209,6 +221,31 @@ export default function AdminPage() {
         setReports(formattedReports);
       } else {
         setReports([]);
+      }
+
+      // Load pending clans (supreme_admin only)
+      if (isSuperAdmin) {
+        const { data: clansData } = await supabase
+          .from('clans')
+          .select('id, name, tag, description, leader_id, status, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+
+        if (clansData && clansData.length > 0) {
+          const leaderIds = clansData.map(c => c.leader_id);
+          const { data: leaderProfiles } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', leaderIds);
+
+          const formattedClans: PendingClan[] = clansData.map(c => ({
+            ...c,
+            leader: leaderProfiles?.find(p => p.id === c.leader_id)
+          }));
+          setPendingClans(formattedClans);
+        } else {
+          setPendingClans([]);
+        }
       }
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -387,6 +424,48 @@ export default function AdminPage() {
     }
   }
 
+  async function handleApproveClan(clanId: string, leaderId: string) {
+    try {
+      // Update clan status
+      await supabase
+        .from('clans')
+        .update({ status: 'approved' })
+        .eq('id', clanId);
+
+      // Add leader to clan_members
+      await supabase.from('clan_members').insert({
+        clan_id: clanId,
+        user_id: leaderId,
+        role: 'leader',
+      });
+
+      // Update clan member count
+      await supabase
+        .from('clans')
+        .update({ total_members: 1 })
+        .eq('id', clanId);
+
+      showToast('Clã aprovado!', 'success');
+      loadData();
+    } catch {
+      showToast('Erro ao aprovar clã', 'error');
+    }
+  }
+
+  async function handleRejectClan(clanId: string) {
+    try {
+      await supabase
+        .from('clans')
+        .update({ status: 'rejected' })
+        .eq('id', clanId);
+
+      showToast('Clã rejeitado', 'info');
+      loadData();
+    } catch {
+      showToast('Erro ao rejeitar clã', 'error');
+    }
+  }
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-16 px-4">
@@ -425,6 +504,7 @@ export default function AdminPage() {
             { id: 'requests', label: 'Pedidos de Sala', icon: MessageCircle, count: roomRequests.length },
             { id: 'reports', label: 'Denúncias', icon: AlertTriangle, count: reports.length },
             { id: 'admin_requests', label: 'Pedidos Admin', icon: Shield, count: adminRequests.length },
+            ...(isSuperAdmin ? [{ id: 'clans', label: 'Clãs Pendentes', icon: ShieldCheck, count: pendingClans.length }] : []),
             { id: 'admins', label: 'Admins', icon: Users, count: adminUsers.length },
             { id: 'publishers', label: 'Publicadores', icon: Calendar },
           ].map(tab => (
@@ -558,6 +638,55 @@ export default function AdminPage() {
                           className="btn btn-ghost flex-1 justify-center text-sm"
                         >
                           <X size={14} /> Ignorar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Pending Clans (Supreme Admin only) */}
+            {activeTab === 'clans' && isSuperAdmin && (
+              <div className="space-y-4">
+                {pendingClans.length === 0 ? (
+                  <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
+                    <ShieldCheck className="mx-auto mb-4 text-text3" size={48} />
+                    <h3 className="font-rajdhani font-bold text-xl text-text mb-2">Sem clãs pendentes</h3>
+                    <p className="text-text3 text-sm">Todos os pedidos de clãs foram processados.</p>
+                  </div>
+                ) : (
+                  pendingClans.map(clan => (
+                    <div key={clan.id} className="bg-bg2 border border-border rounded-2xl p-5">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple/20 to-amber/20 flex items-center justify-center text-lg font-bold text-amber">
+                          {clan.tag}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-rajdhani font-bold text-text text-lg">{clan.name}</div>
+                          <div className="text-xs text-text3 mb-2">
+                            Líder: @{clan.leader?.username || 'Desconhecido'} · Pedido em {new Date(clan.created_at).toLocaleDateString('pt-AO')}
+                          </div>
+                          {clan.description && (
+                            <div className="bg-bg3 rounded-xl p-4 border border-border">
+                              <p className="text-sm text-text2">{clan.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 mt-4">
+                        <button
+                          onClick={() => handleApproveClan(clan.id, clan.leader_id)}
+                          className="btn btn-teal flex-1 justify-center"
+                        >
+                          <Check size={16} /> Aprovar Clã
+                        </button>
+                        <button
+                          onClick={() => handleRejectClan(clan.id)}
+                          className="btn btn-danger flex-1 justify-center"
+                        >
+                          <X size={16} /> Rejeitar
                         </button>
                       </div>
                     </div>

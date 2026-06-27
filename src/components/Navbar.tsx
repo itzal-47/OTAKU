@@ -175,12 +175,12 @@ export default function Navbar() {
               <MessageSquare size={18} />
             </Link>
             <NotificationBell />
-            {profile?.is_super_admin && (
+            {(profile?.is_super_admin || profile?.role === 'supreme_admin') && (
               <Link to="/inbox" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors text-amber" title="Inbox Admin">
                 <Inbox size={18} />
               </Link>
             )}
-            {profile?.is_admin && (
+            {(profile?.is_admin || profile?.role === 'secondary_admin' || profile?.role === 'supreme_admin') && (
               <Link to="/admin" className="btn btn-ghost text-xs py-2 px-3 text-amber">
                 Admin
               </Link>
@@ -313,7 +313,7 @@ export default function Navbar() {
                 >
                   ⚙️ Configurações
                 </Link>
-                {profile?.is_super_admin && (
+                {(profile?.is_super_admin || profile?.role === 'supreme_admin') && (
                   <Link
                     to="/inbox"
                     onClick={() => setMobileOpen(false)}
@@ -322,7 +322,7 @@ export default function Navbar() {
                     📥 Inbox Admin
                   </Link>
                 )}
-                {profile?.is_admin && (
+                {(profile?.is_admin || profile?.role === 'secondary_admin' || profile?.role === 'supreme_admin') && (
                   <Link
                     to="/admin"
                     onClick={() => setMobileOpen(false)}

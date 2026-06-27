@@ -4,7 +4,6 @@ import { CLASS_INFO, type CharacterClass } from '../types/index';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import StoriesBar from '../components/StoriesBar';
-import OnboardingScreen from '../components/OnboardingScreen';
 import CommunityHighlights from '../components/CommunityHighlights';
 import GuestCTA from '../components/GuestCTA';
 
@@ -17,27 +16,6 @@ interface Stats {
 export default function HomePage() {
   const { user, character } = useAuth();
   const [stats, setStats] = useState<Stats>({ warriors: 0, duels: 0, online: 0 });
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    // Show onboarding ONLY when user logs in (session-based)
-    if (user && typeof window !== 'undefined') {
-      const hasCompletedOnboarding = localStorage.getItem('otakukamba-onboarding');
-      const justLoggedIn = sessionStorage.getItem('otakukamba-just-logged-in');
-      const justRegistered = sessionStorage.getItem('otakukamba-just-registered');
-
-      // Show onboarding only for:
-      // 1. First time users who haven't completed onboarding
-      // 2. Users who just logged in this session
-      // 3. Users who just registered
-      if (!hasCompletedOnboarding || justLoggedIn === 'true' || justRegistered === 'true') {
-        setShowOnboarding(true);
-        // Clear the session flags after showing once
-        sessionStorage.removeItem('otakukamba-just-logged-in');
-        sessionStorage.removeItem('otakukamba-just-registered');
-      }
-    }
-  }, [user]);
 
   useEffect(() => {
     async function loadStats() {
@@ -62,15 +40,6 @@ export default function HomePage() {
 
   return (
     <div className="relative overflow-hidden">
-      {/* Onboarding */}
-      {showOnboarding && user && (
-        <OnboardingScreen
-          onComplete={() => {
-            localStorage.setItem('otakukamba-onboarding', '1');
-            setShowOnboarding(false);
-          }}
-        />
-      )}
 
       {/* Kanji Background */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.025] font-japanese text-[120px] font-light leading-tight break-all p-5 select-none overflow-hidden text-purple/50">

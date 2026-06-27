@@ -39,11 +39,11 @@ export default function FounderPage() {
     setLoading(true);
 
     try {
-      // Update profile to super_admin with title and verified
+      // Update profile to supreme_admin with title and verified
       const { error } = await supabase
         .from('profiles')
         .update({
-          role: 'super_admin',
+          role: 'supreme_admin',
           is_super_admin: true,
           is_admin: true,
           is_verified: true,
@@ -193,7 +193,7 @@ export default function FounderPage() {
                 </div>
               </div>
 
-              {profile?.role === 'super_admin' ? (
+              {profile?.role === 'supreme_admin' ? (
                 <button
                   onClick={() => setShowTerminal(true)}
                   className="btn btn-ghost flex items-center gap-2 border-amber/30 text-amber hover:bg-amber/10"

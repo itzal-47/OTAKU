@@ -65,7 +65,7 @@ export interface UserProfile {
   is_super_admin?: boolean;
   is_event_publisher?: boolean;
   is_verified?: boolean;
-  role?: 'user' | 'admin' | 'super_admin';
+  role?: 'member' | 'secondary_admin' | 'supreme_admin';
   title?: string;
   title_color?: string;
   created_at: string;

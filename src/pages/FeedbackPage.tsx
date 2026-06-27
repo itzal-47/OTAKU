@@ -25,7 +25,7 @@ export default function FeedbackPage() {
   const [type, setType] = useState<'suggestion' | 'bug' | 'feature'>('suggestion');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const isAdmin = profile?.is_admin || profile?.is_super_admin;
+  const isAdmin = profile?.is_admin || profile?.is_super_admin || profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin';
 
   useEffect(() => {
     loadFeedback();

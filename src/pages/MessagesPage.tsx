@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 interface PrivateChat {
   id: string;
@@ -29,6 +29,7 @@ interface Profile {
 
 export default function MessagesPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [chats, setChats] = useState<PrivateChat[]>([]);
   const [messages, setMessages] = useState<PrivateMessage[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
@@ -41,6 +42,44 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Handle navigation state from ProfilePage (startChatWith)
+  useEffect(() => {
+    const startChatWith = (location.state as any)?.startChatWith;
+    if (startChatWith && user) {
+      // Clear the state to prevent re-triggering
+      window.history.replaceState({}, '');
+      // Start chat with the user ID
+      async function autoStartChat() {
+        const otherId = startChatWith;
+        if (otherId === user.id) return;
+
+        // Check if chat already exists
+        const { data: existing } = await supabase
+          .from('private_chats')
+          .select('*')
+          .or(`and(user1_id.eq.${user.id},user2_id.eq.${otherId}),and(user1_id.eq.${otherId},user2_id.eq.${user.id})`)
+          .maybeSingle();
+
+        if (existing) {
+          setActiveChat((existing as PrivateChat).id);
+        } else {
+          // Create new chat
+          const { data: newChat } = await supabase
+            .from('private_chats')
+            .insert({ user1_id: user.id, user2_id: otherId })
+            .select()
+            .single();
+
+          if (newChat) {
+            setActiveChat((newChat as PrivateChat).id);
+            await loadChats();
+          }
+        }
+      }
+      autoStartChat();
+    }
+  }, [location.state, user]);
 
   async function loadChats() {
     if (!user) return;

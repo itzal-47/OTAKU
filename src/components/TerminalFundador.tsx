@@ -52,7 +52,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
       .single();
     setProfileData(data);
 
-    if (data?.role === 'super_admin') {
+    if (data?.role === 'supreme_admin') {
       addOutput(`⚡ Bem-vindo de volta, FUNDADOR ${data.username}!`);
       addOutput('─────────────────────────────────────────────');
     }
@@ -202,11 +202,11 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
     addOutput('═════════════ COMANDOS DISPONÍVEIS ═════════════');
     addOutput('');
 
-    const role = profileData?.role || 'user';
+    const role = profileData?.role || 'member';
 
     commands.forEach(c => {
-      if (c.superAdmin && role !== 'super_admin') return;
-      if (c.admin && role !== 'admin' && role !== 'super_admin') return;
+      if (c.superAdmin && role !== 'supreme_admin') return;
+      if (c.admin && role !== 'secondary_admin' && role !== 'supreme_admin') return;
       addOutput(`  ${c.cmd.padEnd(25)} │ ${c.desc}`);
     });
 
@@ -215,7 +215,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function showStats() {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA: Apenas Admins podem executar este comando.');
       return;
     }
@@ -242,7 +242,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function listUsers() {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA: Apenas Admins podem executar este comando.');
       return;
     }
@@ -263,7 +263,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
     addOutput('');
 
     data.forEach(u => {
-      const roleIcon = u.role === 'super_admin' ? '👑' : u.role === 'admin' ? '⭐' : '👤';
+      const roleIcon = u.role === 'supreme_admin' ? '👑' : u.role === 'secondary_admin' ? '⭐' : '👤';
       addOutput(`  ${roleIcon} ${u.username.padEnd(20)} │ ${u.role.padEnd(12)} │ ${u.id.substring(0, 8)}...`);
     });
 
@@ -271,7 +271,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function viewUser(userId: string) {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -319,14 +319,14 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function grantAdmin(userId: string) {
-    if (!isEligible('super_admin')) {
+    if (!isEligible('supreme_admin')) {
       addOutput('PERMISSÃO NEGADA: Apenas o FUNDADOR pode executar este comando.');
       return;
     }
 
     const { error } = await supabase
       .from('profiles')
-      .update({ role: 'admin', is_admin: true })
+      .update({ role: 'secondary_admin', is_admin: true })
       .eq('id', userId);
 
     if (error) {
@@ -338,14 +338,14 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function revokeAdmin(userId: string) {
-    if (!isEligible('super_admin')) {
+    if (!isEligible('supreme_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
 
     const { error } = await supabase
       .from('profiles')
-      .update({ role: 'user', is_admin: false })
+      .update({ role: 'member', is_admin: false })
       .eq('id', userId);
 
     if (error) {
@@ -356,7 +356,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function grantXP(userId: string, amount: number) {
-    if (!isEligible('super_admin')) {
+    if (!isEligible('supreme_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -386,7 +386,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function clearLogs() {
-    if (!isEligible('super_admin')) {
+    if (!isEligible('supreme_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -422,7 +422,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function showDuelsStats() {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -445,7 +445,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function showClanStats() {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -467,7 +467,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
   }
 
   async function showShopStats() {
-    if (!isEligible('admin')) {
+    if (!isEligible('secondary_admin')) {
       addOutput('PERMISSÃO NEGADA');
       return;
     }
@@ -485,12 +485,12 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
     addOutput('');
   }
 
-  function isEligible(requiredRole: 'admin' | 'super_admin'): boolean {
-    const currentRole = profileData?.role || 'user';
-    if (requiredRole === 'super_admin') {
-      return currentRole === 'super_admin';
+  function isEligible(requiredRole: 'secondary_admin' | 'supreme_admin'): boolean {
+    const currentRole = profileData?.role || 'member';
+    if (requiredRole === 'supreme_admin') {
+      return currentRole === 'supreme_admin';
     }
-    return currentRole === 'admin' || currentRole === 'super_admin';
+    return currentRole === 'secondary_admin' || currentRole === 'supreme_admin';
   }
 
   if (!isOpen) return null;
@@ -503,7 +503,7 @@ export default function TerminalFundador({ isOpen, onClose }: TerminalFundadorPr
           <div className="flex items-center gap-3">
             <Terminal className="text-amber" size={24} />
             <span className="font-bebas text-xl text-amber tracking-wider">TERMINAL DO FUNDADOR</span>
-            {profileData?.role === 'super_admin' && (
+            {profileData?.role === 'supreme_admin' && (
               <span className="px-2 py-0.5 bg-amber/20 text-amber text-xs font-bold rounded animate-pulse">
                 FUNDADOR
               </span>
