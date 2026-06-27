@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
@@ -37,7 +38,7 @@ export default function DashboardPage() {
           .from('characters')
           .select('*')
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();  // ✅ era .single() → erro PGRST116 sem personagem
 
         setUserCharacter(charData);
 
@@ -106,8 +107,8 @@ export default function DashboardPage() {
           setUserBadges((badgesData as any) || []);
         }
 
-        // Create user_settings if not exists
-        await supabase.from('user_settings').insert({ user_id: userId })
+        // Criar user_settings se não existir (ignora conflito)
+        await supabase.from('user_settings').upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true })
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -531,3 +532,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

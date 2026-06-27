@@ -5,88 +5,84 @@ import { useToast } from '../components/ToastContext';
 import { supabase } from '../lib/supabase';
 import { CLASS_INFO, type CharacterClass } from '../types/index';
 
+const BASE_STATS: Record<CharacterClass, { hp: number; attack: number; defense: number; speed: number; special: number }> = {
+  ninja:     { hp: 800,  attack: 75, defense: 50, speed: 90, special: 85 },
+  pirata:    { hp: 1000, attack: 90, defense: 70, speed: 60, special: 80 },
+  shinigami: { hp: 750,  attack: 80, defense: 45, speed: 70, special: 95 },
+  cavaleiro: { hp: 850,  attack: 70, defense: 80, speed: 75, special: 70 },
+  cacador:   { hp: 700,  attack: 85, defense: 55, speed: 95, special: 80 },
+  tita:      { hp: 1200, attack: 95, defense: 90, speed: 40, special: 60 },
+};
+
 export default function CreateCharacterPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [checkingCharacter, setCheckingCharacter] = useState(true);
-  const [hasCharacter, setHasCharacter] = useState(false);
-  const [step, setStep] = useState<'name' | 'class' | 'confirm'>('name');
-  const [name, setName] = useState('');
-  const [selectedClass, setSelectedClass] = useState<CharacterClass>('ninja');
+
+  const [loading, setLoading]               = useState(false);
+  const [checkingCharacter, setChecking]    = useState(true);
+  const [step, setStep]                     = useState<'name' | 'class' | 'confirm'>('name');
+  const [name, setName]                     = useState('');
+  const [selectedClass, setSelectedClass]   = useState<CharacterClass>('ninja');
+  const [isEditing, setIsEditing]           = useState(false); // true quando utilizador já tem personagem
 
   const classInfo = CLASS_INFO[selectedClass];
 
   useEffect(() => {
-    if (user) {
-      checkExistingCharacter();
-    }
+    if (user) checkExistingCharacter();
   }, [user]);
 
   async function checkExistingCharacter() {
-    setCheckingCharacter(true);
+    setChecking(true);
     const { data: existingChar } = await supabase
       .from('characters')
       .select('*')
       .eq('user_id', user!.id)
-      .maybeSingle();
+      .maybeSingle();  // ✅ era .single() no fluxo original — usamos maybeSingle por segurança
 
     if (existingChar) {
-      setHasCharacter(true);
+      setIsEditing(true);
       setName(existingChar.name);
       setSelectedClass(existingChar.class as CharacterClass);
     }
-    setCheckingCharacter(false);
+    setChecking(false);
   }
 
   const handleCreate = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (name.length < 3) {
-      showToast('Nome deve ter pelo menos 3 caracteres', 'error');
-      return;
-    }
+    if (!user) { navigate('/login'); return; }
+    if (name.length < 3) { showToast('Nome deve ter pelo menos 3 caracteres', 'error'); return; }
 
     setLoading(true);
-
     try {
-      const baseStats = {
-        ninja: { hp: 800, attack: 75, defense: 50, speed: 90, special: 85 },
-        pirata: { hp: 1000, attack: 90, defense: 70, speed: 60, special: 80 },
-        shinigami: { hp: 750, attack: 80, defense: 45, speed: 70, special: 95 },
-        cavaleiro: { hp: 850, attack: 70, defense: 80, speed: 75, special: 70 },
-        cacador: { hp: 700, attack: 85, defense: 55, speed: 95, special: 80 },
-        tita: { hp: 1200, attack: 95, defense: 90, speed: 40, special: 60 },
-      };
+      const stats = BASE_STATS[selectedClass];
 
-      const stats = baseStats[selectedClass];
-
-      const { error: upsertError } = await supabase.from('characters').upsert({
-        user_id: user.id,
-        name,
-        class: selectedClass,
-        level: 1,
-        xp: 0,
-        hp: stats.hp,
-        max_hp: stats.hp,
-        attack: stats.attack,
-        defense: stats.defense,
-        speed: stats.speed,
-        special: stats.special,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-      }, { onConflict: 'user_id' });
+      const { error: upsertError } = await supabase.from('characters').upsert(
+        {
+          user_id:  user.id,
+          name,
+          class:    selectedClass,
+          level:    1,
+          xp:       0,
+          hp:       stats.hp,
+          max_hp:   stats.hp,
+          attack:   stats.attack,
+          defense:  stats.defense,
+          speed:    stats.speed,
+          special:  stats.special,
+          wins:     0,
+          losses:   0,
+          draws:    0,
+        },
+        { onConflict: 'user_id' }
+      );
 
       if (upsertError) throw upsertError;
 
-      showToast('Personagem criado com sucesso!', 'success');
+      showToast(
+        isEditing ? 'Personagem atualizado!' : 'Personagem criado com sucesso!',
+        'success'
+      );
 
-      // Mark onboarding as completed for this session
       if (typeof window !== 'undefined') {
         localStorage.setItem('otakukamba-onboarding', 'done');
         sessionStorage.setItem('otakukamba-just-registered', 'true');
@@ -100,6 +96,8 @@ export default function CreateCharacterPage() {
       setLoading(false);
     }
   };
+
+  // ── Guards ────────────────────────────────────────────────────────────────
 
   if (!user) {
     return (
@@ -120,21 +118,10 @@ export default function CreateCharacterPage() {
     );
   }
 
-  // If already has character, allow to customize
-  if (hasCharacter && step === 'confirm') {
-    return (
-      <div className="min-h-screen flex items-center justify-center pt-16 px-4">
-        <div className="max-w-md w-full text-center">
-          <h1 className="font-bebas text-4xl text-text mb-4">Personagem Existente</h1>
-          <p className="text-text2 mb-6">Já tens um personagem: <strong className="text-purple">{name}</strong> ({selectedClass})</p>
-          <div className="flex gap-4 justify-center">
-            <button onClick={() => setStep('name')} className="btn btn-ghost">Customizar</button>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-primary">Ir ao Dashboard</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const steps = ['name', 'class', 'confirm'] as const;
+  const stepIndex = steps.indexOf(step);
 
   return (
     <div className="min-h-screen flex items-center justify-center pt-16 px-4">
@@ -146,20 +133,32 @@ export default function CreateCharacterPage() {
       <div className="relative z-10 w-full max-w-xl">
         {/* Progress */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {['name', 'class', 'confirm'].map((s, i) => (
+          {steps.map((s, i) => (
             <div
               key={s}
               className={`h-1 flex-1 max-w-32 rounded-full transition-all ${
-                step === s || (step === 'name' ? false : i < ['name', 'class', 'confirm'].indexOf(step))
-                  ? 'bg-purple'
-                  : 'bg-bg3'
+                i <= stepIndex ? 'bg-purple' : 'bg-bg3'
               }`}
             />
           ))}
         </div>
 
+        {/* Aviso suave quando editando */}
+        {isEditing && (
+          <div className="mb-4 bg-amber/10 border border-amber/30 rounded-xl px-4 py-3 text-sm text-amber text-center">
+            ✏️ Já tens um personagem — podes <strong>editar</strong> ou ir ao{' '}
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="underline font-semibold"
+            >
+              Dashboard
+            </button>.
+          </div>
+        )}
+
         <div className="bg-bg2 border border-border rounded-3xl p-10">
-          {/* Step 1: Name */}
+
+          {/* ── Step 1: Name ── */}
           {step === 'name' && (
             <div className="text-center">
               <div className="text-5xl mb-6">⚔️</div>
@@ -187,7 +186,7 @@ export default function CreateCharacterPage() {
             </div>
           )}
 
-          {/* Step 2: Class */}
+          {/* ── Step 2: Class ── */}
           {step === 'class' && (
             <div>
               <div className="text-center mb-8">
@@ -237,16 +236,18 @@ export default function CreateCharacterPage() {
             </div>
           )}
 
-          {/* Step 3: Confirm */}
+          {/* ── Step 3: Confirm ── */}
+          {/* ✅ Bug corrigido: antes, se o utilizador já tinha personagem (hasCharacter),
+               este passo mostrava um ecrã "Personagem Existente" em vez da confirmação,
+               tornando impossível criar/atualizar o personagem. Agora mostra sempre
+               a confirmação, e o upsert trata a criação e a atualização. */}
           {step === 'confirm' && (
             <div className="text-center">
               <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple to-red flex items-center justify-center text-5xl mx-auto mb-6">
                 {classInfo.emoji}
               </div>
 
-              <h1 className="font-bebas text-4xl tracking-wide text-text mb-2">
-                {name}
-              </h1>
+              <h1 className="font-bebas text-4xl tracking-wide text-text mb-2">{name}</h1>
               <p className="text-text2 mb-8">
                 {classInfo.name} · Nível 1 · {classInfo.anime}
               </p>
@@ -255,21 +256,13 @@ export default function CreateCharacterPage() {
                 <div className="text-xs uppercase tracking-wider text-text3 mb-2">Atributos Base</div>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   {(() => {
-                    const baseStats = {
-                      ninja: { hp: 800, attack: 75, defense: 50, speed: 90, special: 85 },
-                      pirata: { hp: 1000, attack: 90, defense: 70, speed: 60, special: 80 },
-                      shinigami: { hp: 750, attack: 80, defense: 45, speed: 70, special: 95 },
-                      cavaleiro: { hp: 850, attack: 70, defense: 80, speed: 75, special: 70 },
-                      cacador: { hp: 700, attack: 85, defense: 55, speed: 95, special: 80 },
-                      tita: { hp: 1200, attack: 95, defense: 90, speed: 40, special: 60 },
-                    };
-                    const stats = baseStats[selectedClass];
+                    const stats = BASE_STATS[selectedClass];
                     return (
                       <>
-                        <div><span className="text-text3">HP:</span> <span className="text-teal font-bold">{stats.hp}</span></div>
-                        <div><span className="text-text3">ATK:</span> <span className="text-red font-bold">{stats.attack}</span></div>
+                        <div><span className="text-text3">HP:</span>  <span className="text-teal   font-bold">{stats.hp}</span></div>
+                        <div><span className="text-text3">ATK:</span> <span className="text-red    font-bold">{stats.attack}</span></div>
                         <div><span className="text-text3">DEF:</span> <span className="text-purple font-bold">{stats.defense}</span></div>
-                        <div><span className="text-text3">SPD:</span> <span className="text-amber font-bold">{stats.speed}</span></div>
+                        <div><span className="text-text3">SPD:</span> <span className="text-amber  font-bold">{stats.speed}</span></div>
                         <div><span className="text-text3">SPC:</span> <span className="text-purple2 font-bold">{stats.special}</span></div>
                       </>
                     );
@@ -289,11 +282,9 @@ export default function CreateCharacterPage() {
                   {loading ? (
                     <span className="flex items-center gap-2">
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      A criar...
+                      A guardar...
                     </span>
-                  ) : (
-                    'Criar Personagem'
-                  )}
+                  ) : isEditing ? 'Atualizar Personagem' : 'Criar Personagem'}
                 </button>
               </div>
             </div>

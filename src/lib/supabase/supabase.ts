@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -9,16 +9,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
+    persistSession:    true,
+    autoRefreshToken:  true,
+    detectSessionInUrl: true,
+  },
 });
+
+// ─── Auth helpers ─────────────────────────────────────────────────────────
 
 export async function getCurrentUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
+
+// NOTA: estas funções chamam getUser() internamente — não as chamar dentro
+// de onAuthStateChange ou terás um loop infinito. No AuthContext usamos as
+// funções locais fetchProfileById / fetchCharacterByUserId em alternativa.
 
 export async function getCurrentProfile() {
   const user = await getCurrentUser();
@@ -28,7 +34,7 @@ export async function getCurrentProfile() {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();   // ✅ era .single() → lançava PGRST116 se sem linha
 
   return profile;
 }
@@ -38,59 +44,56 @@ export async function getCharacter(userId: string) {
     .from('characters')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();   // ✅ era .single() → lançava PGRST116 se sem personagem
 
   return character;
 }
 
+// ─── Chat rooms ───────────────────────────────────────────────────────────
+
 export async function createDefaultRoomsIfNotExist(userId: string) {
   const defaultRooms = [
-    { slug: 'geral', name: 'Geral', description: 'Conversas gerais sobre anime' },
-    { slug: 'one-piece', name: 'One Piece', description: 'Discussões sobre One Piece' },
-    { slug: 'naruto', name: 'Naruto', description: 'Discussões sobre Naruto' },
-    { slug: 'demon-slayer', name: 'Demon Slayer', description: 'Discussões sobre Demon Slayer' },
-    { slug: 'jujutsu-kaisen', name: 'Jujutsu Kaisen', description: 'Discussões sobre Jujutsu Kaisen' },
-    { slug: 'bleach', name: 'Bleach', description: 'Discussões sobre Bleach' },
-    { slug: 'attack-on-titan', name: 'Attack on Titan', description: 'Discussões sobre Attack on Titan' },
-    { slug: 'arena', name: 'Arena Chat', description: 'Conversas sobre duelos' },
+    { slug: 'geral',           name: 'Geral',           description: 'Conversas gerais sobre anime' },
+    { slug: 'one-piece',       name: 'One Piece',        description: 'Discussões sobre One Piece' },
+    { slug: 'naruto',          name: 'Naruto',           description: 'Discussões sobre Naruto' },
+    { slug: 'demon-slayer',    name: 'Demon Slayer',     description: 'Discussões sobre Demon Slayer' },
+    { slug: 'jujutsu-kaisen',  name: 'Jujutsu Kaisen',  description: 'Discussões sobre Jujutsu Kaisen' },
+    { slug: 'bleach',          name: 'Bleach',           description: 'Discussões sobre Bleach' },
+    { slug: 'attack-on-titan', name: 'Attack on Titan',  description: 'Discussões sobre Attack on Titan' },
+    { slug: 'arena',           name: 'Arena Chat',       description: 'Conversas sobre duelos' },
   ];
 
   for (const room of defaultRooms) {
     try {
-      await supabase
-        .from('chat_rooms')
-        .insert({
-          slug: room.slug,
-          name: room.name,
-          description: room.description,
-          type: 'public',
-          created_by: userId
-        });
-    } catch {}
+      await supabase.from('chat_rooms').insert({
+        slug:        room.slug,
+        name:        room.name,
+        description: room.description,
+        type:        'public',
+        created_by:  userId,
+      });
+    } catch { /* sala já existe — ignora */ }
   }
 }
 
-export async function signUp(email: string, password: string, username: string, characterClass: string) {
+// ─── Auth wrappers (compatibilidade) ──────────────────────────────────────
+
+export async function signUp(
+  email: string,
+  password: string,
+  username: string,
+  characterClass: string
+) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      data: {
-        username,
-        character_class: characterClass
-      }
-    }
+    options: { data: { username, character_class: characterClass } },
   });
-
   return { data, error };
 }
 
 export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
-
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   return { data, error };
 }
 
@@ -102,21 +105,15 @@ export async function signOut() {
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/dashboard`
-    }
+    options:  { redirectTo: `${window.location.origin}/dashboard` },
   });
-
   return { data, error };
 }
 
 export async function signInWithDiscord() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'discord',
-    options: {
-      redirectTo: `${window.location.origin}/dashboard`
-    }
+    options:  { redirectTo: `${window.location.origin}/dashboard` },
   });
-
   return { data, error };
 }
