@@ -212,11 +212,14 @@ export default function FeedPage() {
 
       if (error) throw error;
 
+      // Award +10 XP for creating a post
+      await supabase.rpc('increment_user_xp', { p_user_id: user.id, p_amount: 10 });
+
       setNewPostContent('');
       setUploadedMediaUrl(null);
       setNewPostMediaType('none');
       setShowCreatePost(false);
-      showToast('Publicação criada!', 'success');
+      showToast('Publicação criada! +10 XP', 'success');
       loadPosts();
     } catch {
       showToast('Erro ao criar publicação', 'error');
@@ -331,11 +334,15 @@ export default function FeedPage() {
         content: newComment.trim()
       });
 
+      // Award +5 XP for adding a comment
+      await supabase.rpc('increment_user_xp', { p_user_id: user.id, p_amount: 5 });
+
       setNewComment('');
       loadComments(postId);
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p
       ));
+      showToast('+5 XP', 'success');
     } catch {
       showToast('Erro ao comentar', 'error');
     }

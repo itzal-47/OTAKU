@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
-import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy, Crown } from 'lucide-react';
+import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy, Crown, Heart } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -276,6 +276,7 @@ export default function Navbar() {
               { path: '/fundador', label: '👑 FUNDADOR' },
               { path: '/conquistas', label: '🏆 Conquistas' },
               { path: '/quests', label: '⚡ Missões' },
+              { path: '/match', label: '💕 Kamba Match' },
               { path: '/badges', label: '🏅 Badges' },
             ].map(({ path, label }) => (
               <Link

@@ -68,6 +68,13 @@ export interface UserProfile {
   role?: 'member' | 'secondary_admin' | 'supreme_admin';
   title?: string;
   title_color?: string;
+  total_xp?: number;
+  coins?: number;
+  favorite_animes?: string[];
+  favorite_music?: string[];
+  favorite_character?: string;
+  favorite_genre?: string;
+  match_visible?: boolean;
   created_at: string;
   updated_at?: string;
 }

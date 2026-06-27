@@ -45,6 +45,7 @@ import AchievementsPage from './pages/AchievementsPage';
 import FounderPage from './pages/FounderPage';
 import BazarPage from './pages/BazarPage';
 import AnimeSchedulePage from './pages/AnimeSchedulePage';
+import MatchPage from './pages/MatchPage';
 
 function App() {
   return (
@@ -94,6 +95,7 @@ function App() {
               <Route path="fundador" element={<FounderPage />} />
               <Route path="bazar" element={<BazarPage />} />
               <Route path="calendario-anime" element={<AnimeSchedulePage />} />
+              <Route path="match" element={<MatchPage />} />
               <Route path="criar-personagem" element={
                 <ProtectedRoute>
                   <CreateCharacterPage />

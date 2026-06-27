@@ -11,6 +11,7 @@ interface RankingEntry {
   character_class: CharacterClass;
   level: number;
   xp: number;
+  total_xp: number;
   wins: number;
   losses: number;
   win_rate: number;
@@ -67,7 +68,7 @@ export default function RankingsPage() {
         const userIds = characters.map(c => c.user_id);
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, username, city, province')
+          .select('id, username, city, province, total_xp')
           .in('id', userIds);
 
         let combined: RankingEntry[] = characters
@@ -83,6 +84,7 @@ export default function RankingsPage() {
               character_class: char.class as CharacterClass,
               level: char.level,
               xp: char.xp || 0,
+              total_xp: prof?.total_xp || 0,
               wins: char.wins,
               losses: char.losses,
               win_rate: winRate,
