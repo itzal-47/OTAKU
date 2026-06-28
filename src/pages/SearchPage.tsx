@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { Search, UserPlus, UserCheck, Loader2, MapPin } from 'lucide-react';
 
@@ -17,9 +16,18 @@ export default function SearchPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
-  const { user } = useAuth();
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Carrega perfis iniciais (sugestões) ou filtra por termo
+  // 1. Pega o usuário logado diretamente do Supabase (Bypass no AuthContext)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setCurrentUser(data.user);
+      }
+    });
+  }, []);
+
+  // 2. Carrega perfis iniciais (sugestões) ou filtra por termo
   useEffect(() => {
     async function fetchProfiles() {
       setLoading(true);
@@ -37,8 +45,8 @@ export default function SearchPage() {
         }
 
         // Evita mostrar o próprio usuário logado na busca
-        if (user) {
-          query = query.neq('id', user.id);
+        if (currentUser) {
+          query = query.neq('id', currentUser.id);
         }
 
         const { data, error } = await query;
@@ -57,26 +65,27 @@ export default function SearchPage() {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchTerm, user]);
+  }, [searchTerm, currentUser]);
 
-  // Carrega a lista de quem o usuário já segue
+  // 3. Carrega a lista de quem o usuário já segue
   useEffect(() => {
-    if (!user) return;
+    if (!currentUser) return;
     async function fetchFollowing() {
       const { data } = await supabase
         .from('follows')
         .select('following_id')
-        .eq('follower_id', user.id);
+        .eq('follower_id', currentUser.id);
       
       if (data) {
         setFollowingIds(data.map(f => f.following_id));
       }
     }
     fetchFollowing();
-  }, [user]);
+  }, [currentUser]);
 
+  // 4. Lida com o botão de seguir/deixar de seguir
   async function toggleFollow(targetId: string) {
-    if (!user) return;
+    if (!currentUser) return;
     const isFollowing = followingIds.includes(targetId);
 
     try {
@@ -84,13 +93,13 @@ export default function SearchPage() {
         await supabase
           .from('follows')
           .delete()
-          .eq('follower_id', user.id)
+          .eq('follower_id', currentUser.id)
           .eq('following_id', targetId);
         setFollowingIds(prev => prev.filter(id => id !== targetId));
       } else {
         await supabase
           .from('follows')
-          .insert({ follower_id: user.id, following_id: targetId });
+          .insert({ follower_id: currentUser.id, following_id: targetId });
         setFollowingIds(prev => [...prev, targetId]);
       }
     } catch (err) {
@@ -163,7 +172,7 @@ export default function SearchPage() {
                     </div>
                   </Link>
 
-                  {user && (
+                  {currentUser && (
                     <button
                       onClick={() => toggleFollow(profile.id)}
                       className={`btn btn-sm ${
@@ -174,7 +183,7 @@ export default function SearchPage() {
                     >
                       {followingIds.includes(profile.id) ? (
                         <>
-                          <UserCheck className="w-4 h-4 mr-1" /> Segor
+                          <UserCheck className="w-4 h-4 mr-1" /> Seguindo
                         </>
                       ) : (
                         <>
