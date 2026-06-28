@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -103,7 +104,7 @@ export default function ClansPage() {
         .from('clan_members')
         .select('*, clan:clans(*), user:profiles(id, username), character:characters(*)')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       setMyClan(data);
 
@@ -147,7 +148,7 @@ export default function ClansPage() {
       return;
     }
 
-    const profileData = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const profileData = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
     const isSupremeAdmin = profileData.data?.role === 'supreme_admin';
     const isSecondaryAdmin = profileData.data?.role === 'secondary_admin';
 
@@ -184,9 +185,10 @@ export default function ClansPage() {
           status: clanStatus,
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (clanError) throw clanError;
+      if (!newClan) throw new Error('Erro ao criar clã — tenta novamente');  // ✅ null check após maybeSingle
 
       // Only add member and update count if approved
       if (clanStatus === 'approved') {

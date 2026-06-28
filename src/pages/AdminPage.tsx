@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -286,7 +287,7 @@ export default function AdminPage() {
         .eq('created_by', requesterId)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (newRoom) {
         await supabase.from('chat_room_members').insert({
@@ -365,7 +366,7 @@ export default function AdminPage() {
         .from('profiles')
         .select('id')
         .eq('username', newAdminUsername.trim())
-        .single();
+        .maybeSingle();
 
       if (!targetProfile) {
         showToast('Usuário não encontrado', 'error');

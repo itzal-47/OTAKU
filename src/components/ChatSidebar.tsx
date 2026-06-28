@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -68,7 +69,7 @@ export default function ChatSidebar() {
             .from('profiles')
             .select('id, username, avatar_url')
             .eq('id', otherUserId)
-            .single();
+            .maybeSingle();
 
           const { count: unreadCount } = await supabase
             .from('private_messages')
@@ -83,7 +84,7 @@ export default function ChatSidebar() {
             .eq('chat_id', chat.id)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           return {
             id: chat.id,

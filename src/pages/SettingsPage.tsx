@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
@@ -50,7 +51,7 @@ export default function SettingsPage() {
         .from('user_settings')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (settings) {
         setShowProvince(settings.show_province);
@@ -156,8 +157,8 @@ export default function SettingsPage() {
       // Delete related data first
       await supabase.from('characters').delete().eq('user_id', user.id);
       await supabase.from('posts').delete().eq('user_id', user.id);
-      await supabase.from('comments').delete().eq('user_id', user.id);
-      await supabase.from('likes').delete().eq('user_id', user.id);
+      await supabase.from('post_comments').delete().eq('user_id', user.id);  // ✅ era 'comments' (tabela inexistente)
+      await supabase.from('post_likes').delete().eq('user_id', user.id);  // ✅ era 'likes' (tabela inexistente)
       await supabase.from('follows').delete().eq('follower_id', user.id);
       await supabase.from('follows').delete().eq('following_id', user.id);
       await supabase.from('duels').delete().or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`);

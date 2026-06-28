@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -65,13 +66,16 @@ export default function MessagesPage() {
           setActiveChat((existing as PrivateChat).id);
         } else {
           // Create new chat
-          const { data: newChat } = await supabase
+          const { data: newChat, error: chatErr } = await supabase
             .from('private_chats')
             .insert({ user1_id: user.id, user2_id: otherId })
             .select()
-            .single();
+            .maybeSingle();  // ✅ era .single() → lançava erro em inserts duplicados
 
-          if (newChat) {
+          if (chatErr) {
+            // Chat can already exist (race condition) — reload to find it
+            await loadChats();
+          } else if (newChat) {
             setActiveChat((newChat as PrivateChat).id);
             await loadChats();
           }
@@ -238,12 +242,18 @@ export default function MessagesPage() {
       return;
     }
 
-    const { data: newChat } = await supabase
+    const { data: newChat, error: chatErr2 } = await supabase
       .from('private_chats')
       .insert({ user1_id: user.id, user2_id: otherId })
       .select()
-      .single();
+      .maybeSingle();  // ✅ era .single() → lançava erro em inserts duplicados
 
+    if (chatErr2) {
+      // Race condition: chat already exists, reload to find it
+      await loadChats();
+      setCreating(false);
+      return;
+    }
     if (newChat) {
       setActiveChat((newChat as PrivateChat).id);
       setNewChatUserId('');

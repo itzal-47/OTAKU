@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
@@ -252,9 +253,14 @@ export default function ArenaPage() {
         })
         .eq('id', duelId)
         .select()
-        .single();
+        .maybeSingle();  // ✅ era .single() → race condition se duelo já foi aceite
 
       if (error) throw error;
+      if (!duel) {
+        showToast('Este duelo já foi aceite por outro utilizador', 'info');
+        loadArenaData();
+        return;
+      }
       await simulateDuel(duelId, opponentId);
     } catch {
       showToast('Erro ao entrar no duelo', 'error');
@@ -269,7 +275,7 @@ export default function ArenaPage() {
       .from('characters')
       .select('*')
       .eq('user_id', opponentId)
-      .single();
+      .maybeSingle();  // ✅ era .single() → lançava PGRST116 se sem personagem
     if (!opponentChar) {
       showToast('Erro ao carregar oponente', 'error');
       return;

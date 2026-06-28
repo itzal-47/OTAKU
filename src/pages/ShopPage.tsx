@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -137,7 +138,7 @@ export default function ShopPage() {
               .eq('user_id', user.id)
           : { data: [] },
         user
-          ? supabase.from('profiles').select('total_xp, coins').eq('id', user.id).single()
+          ? supabase.from('profiles').select('total_xp, coins').eq('id', user.id).maybeSingle()
           : { data: null },
       ]);
 
@@ -193,21 +194,22 @@ export default function ShopPage() {
 
       if (xpError) throw xpError;
 
-      // Add to inventory
-      const { error: invError } = await supabase.from('user_inventory').insert({
-        user_id: user.id,
-        item_id: item.id,
-        quantity: existing ? existing.quantity + 1 : 1,
-      });
-
-      if (invError) throw invError;
-
-      // If existing, update quantity
+      // ✅ Bug corrigido: antes inseria E atualizava para consumíveis existentes,
+      //    criando linhas duplicadas no inventário.
+      //    Agora: se já existe → só atualiza. Se não existe → insere.
       if (existing) {
-        await supabase
+        const { error: invError } = await supabase
           .from('user_inventory')
           .update({ quantity: existing.quantity + 1 })
           .eq('id', existing.id);
+        if (invError) throw invError;
+      } else {
+        const { error: invError } = await supabase.from('user_inventory').insert({
+          user_id: user.id,
+          item_id: item.id,
+          quantity: 1,
+        });
+        if (invError) throw invError;
       }
 
       showToast(`${item.name} comprado com sucesso!`, 'success');

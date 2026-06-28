@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
@@ -13,7 +14,7 @@ async function checkIsAdmin(userId: string): Promise<boolean> {
     .from('profiles')
     .select('role, is_admin')
     .eq('id', userId)
-    .single();
+    .maybeSingle();  // ✅ era .single()
   return profile?.role === 'supreme_admin' || profile?.role === 'secondary_admin' || profile?.is_admin || false;
 }
 
@@ -158,11 +159,11 @@ export default function ChatPage() {
 
       // Auto-join only public rooms
       if (!myMembership && selectedRoom.type !== 'private') {
-        await supabase.from('chat_room_members').insert({
+        await supabase.from('chat_room_members').upsert({
           room_id: selectedRoom.id,
           user_id: user.id,
           role: 'member'
-        });
+        }, { onConflict: 'room_id,user_id', ignoreDuplicates: true });  // ✅ era insert → duplicate key em StrictMode
         loadRoomMembers();
       }
     }
@@ -630,7 +631,7 @@ function CreateRoomRequestModal({
             created_by: user.id
           })
           .select()
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
 

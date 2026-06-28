@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -46,7 +47,7 @@ export default function ProfilePage() {
         .from('profiles')
         .select('id, username, city, province, created_at, is_verified, role, title, title_color')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
       if (!profileData) {
         setLoading(false);
@@ -60,7 +61,7 @@ export default function ProfilePage() {
         .from('characters')
         .select('*')
         .eq('user_id', profileData.id)
-        .single();
+        .maybeSingle();
 
       setCharacter(charData);
 
@@ -100,7 +101,7 @@ export default function ProfilePage() {
         .from('clan_members')
         .select('role, clan:clans(name, tag)')
         .eq('user_id', profileData.id)
-        .single();
+        .maybeSingle();
 
       if (clanMember) {
         setClanInfo({

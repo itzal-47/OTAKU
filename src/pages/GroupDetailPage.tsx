@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -91,7 +92,7 @@ export default function GroupDetailPage() {
   async function loadData() {
     if (!id) return;
     setLoading(true);
-    const { data: gData } = await supabase.from('groups').select('*').eq('id', id).single();
+    const { data: gData } = await supabase.from('groups').select('*').eq('id', id).maybeSingle();
     if (!gData) {
       setLoading(false);
       return;

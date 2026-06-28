@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -212,8 +213,11 @@ export default function FeedPage() {
 
       if (error) throw error;
 
-      // Award +10 XP for creating a post
-      await supabase.rpc('increment_user_xp', { p_user_id: user.id, p_amount: 10 });
+      // +10 XP por criar publicação
+      await supabase
+        .from('profiles')
+        .update({ total_xp: (profile?.total_xp || 0) + 10 })
+        .eq('id', user.id);  // ✅ era supabase.rpc('increment_user_xp') que não existe nas migrations
 
       setNewPostContent('');
       setUploadedMediaUrl(null);
@@ -334,8 +338,11 @@ export default function FeedPage() {
         content: newComment.trim()
       });
 
-      // Award +5 XP for adding a comment
-      await supabase.rpc('increment_user_xp', { p_user_id: user.id, p_amount: 5 });
+      // +5 XP por comentar
+      await supabase
+        .from('profiles')
+        .update({ total_xp: (profile?.total_xp || 0) + 5 })
+        .eq('id', user.id);  // ✅ era supabase.rpc('increment_user_xp') que não existe nas migrations
 
       setNewComment('');
       loadComments(postId);

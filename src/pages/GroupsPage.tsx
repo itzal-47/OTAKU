@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
@@ -143,7 +144,7 @@ export default function GroupsPage() {
         post_count: 0,
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !newGroup) {
       setCreateError(error?.message || 'Erro ao criar grupo.');

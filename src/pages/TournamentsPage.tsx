@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -94,7 +95,7 @@ export default function TournamentsPage() {
         .from('tournaments')
         .select('*')
         .eq('id', tournamentId)
-        .single();
+        .maybeSingle();
 
       setSelectedTournament(tournament);
 

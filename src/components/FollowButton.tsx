@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
@@ -33,7 +34,7 @@ export default function FollowButton({ targetUserId, targetUsername, onFollowCha
         .select('id')
         .eq('follower_id', user.id)
         .eq('following_id', targetUserId)
-        .single();
+        .maybeSingle();
 
       setIsFollowing(!!data);
     } catch {
