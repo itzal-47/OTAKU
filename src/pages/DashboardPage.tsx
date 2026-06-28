@@ -1,12 +1,11 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { supabase } from '../lib/supabase';
 import { CLASS_INFO, type CharacterClass, type Character, type UserQuest, type UserBadge, type Badge } from '../types/index';
 import {
-  Swords, Trophy, TrendingUp, Clock, Settings, LogOut, Target, Award,
-  Sparkles, Zap, Crown, Star, CheckCircle2, Circle, Flame
+  Swords, Trophy, TrendingUp, Settings, LogOut, Target, Award,
+  Sparkles, CheckCircle2, Circle, Flame, Copy, Check, Crown, Star
 } from 'lucide-react';
 
 interface Duel {
@@ -27,6 +26,11 @@ export default function DashboardPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [levelUpData, setLevelUpData] = useState({ from: 0, to: 0 });
+  
+  // Novos estados para os Contadores Reais e Copiar ID
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const userId = user?.id;
@@ -34,16 +38,25 @@ export default function DashboardPage() {
 
     async function loadData() {
       try {
+        // Carrega dados do Personagem
         const { data: charData } = await supabase
           .from('characters')
           .select('*')
           .eq('user_id', userId)
-          .maybeSingle();  // ✅ era .single() → erro PGRST116 sem personagem
+          .maybeSingle();
 
         setUserCharacter(charData);
 
+        // Busca contadores de Seguidores e Seguindo em tempo real
+        const [followersRes, followingRes] = await Promise.all([
+          supabase.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', userId),
+          supabase.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', userId)
+        ]);
+
+        setFollowerCount(followersRes.count || 0);
+        setFollowingCount(followingRes.count || 0);
+
         if (charData) {
-          // Check for level up (compare with localStorage)
           const prevLevel = parseInt(localStorage.getItem('prevLevel') || '0');
           if (charData.level > prevLevel && prevLevel > 0) {
             setLevelUpData({ from: prevLevel, to: charData.level });
@@ -55,14 +68,7 @@ export default function DashboardPage() {
           // Get recent duels
           const { data: duels } = await supabase
             .from('duels')
-            .select(`
-              id,
-              created_at,
-              result,
-              xp_reward,
-              challenger_id,
-              opponent_id
-            `)
+            .select(`id, created_at, result, xp_reward, challenger_id, opponent_id`)
             .or(`challenger_id.eq.${userId},opponent_id.eq.${userId}`)
             .eq('status', 'completed')
             .order('created_at', { ascending: false })
@@ -73,10 +79,10 @@ export default function DashboardPage() {
               d.challenger_id === userId ? d.opponent_id : d.challenger_id
             ).filter(Boolean);
 
-            const [{ data: oppChars }, { data: oppProfiles }] = await Promise.all([
-              supabase.from('characters').select('user_id, name, class').in('user_id', opponentIds),
-              supabase.from('profiles').select('id, username').in('id', opponentIds)
-            ]);
+            const { data: oppChars } = await supabase
+              .from('characters')
+              .select('user_id, name, class')
+              .in('user_id', opponentIds);
 
             const formattedDuels: Duel[] = duels.map(duel => {
               const oppId = duel.challenger_id === userId ? duel.opponent_id : duel.challenger_id;
@@ -94,10 +100,8 @@ export default function DashboardPage() {
             setRecentDuels(formattedDuels);
           }
 
-          // Load daily quests
-          if (userId) await loadUserQuests(userId);
+          await loadUserQuests(userId);
 
-          // Load user badges
           const { data: badgesData } = await supabase
             .from('user_badges')
             .select('*, badge:badges(*)')
@@ -107,8 +111,7 @@ export default function DashboardPage() {
           setUserBadges((badgesData as any) || []);
         }
 
-        // Criar user_settings se não existir (ignora conflito)
-        await supabase.from('user_settings').upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true })
+        await supabase.from('user_settings').upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true });
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -121,7 +124,6 @@ export default function DashboardPage() {
 
   async function loadUserQuests(userId: string) {
     try {
-      // Get all active daily quests
       const { data: activeQuests } = await supabase
         .from('quests')
         .select('*')
@@ -130,7 +132,6 @@ export default function DashboardPage() {
 
       if (!activeQuests || activeQuests.length === 0) return;
 
-      // Get user's progress on these quests
       const { data: userQuestsData } = await supabase
         .from('user_quests')
         .select('*, quest:quests(*)')
@@ -138,7 +139,6 @@ export default function DashboardPage() {
         .in('quest_id', activeQuests.map(q => q.id))
         .gte('expires_at', new Date().toISOString());
 
-      // If user doesn't have quests for today, create them
       if (!userQuestsData || userQuestsData.length < activeQuests.length) {
         const existingIds = new Set(userQuestsData?.map(uq => uq.quest_id) || []);
         const toCreate = activeQuests.filter(q => !existingIds.has(q.id));
@@ -152,7 +152,6 @@ export default function DashboardPage() {
             }))
           );
 
-          // Reload
           const { data: newData } = await supabase
             .from('user_quests')
             .select('*, quest:quests(*)')
@@ -170,6 +169,13 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('Error loading quests:', err);
     }
+  }
+
+  function copyIdToClipboard() {
+    if (!user?.id) return;
+    navigator.clipboard.writeText(user.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   const xpProgress = userCharacter ? (userCharacter.xp % 100) : 0;
@@ -201,58 +207,88 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen pt-20 pb-12 px-4">
-      {/* Level Up Celebration */}
       {showLevelUp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="text-center animate-bounce-slow">
             <div className="text-8xl mb-4 animate-pulse">🎉</div>
             <h2 className="font-bebas text-6xl text-gradient mb-2">LEVEL UP!</h2>
-            <p className="text-2xl text-text mb-4">
-              {levelUpData.from} → {levelUpData.to}
-            </p>
-            <div className="flex justify-center gap-4">
-              {[...Array(5)].map((_, i) => (
-                <Sparkles key={i} className="text-amber animate-ping" style={{ animationDelay: `${i * 0.1}s` }} size={32} />
-              ))}
-            </div>
+            <p className="text-2xl text-text mb-4">{levelUpData.from} → {levelUpData.to}</p>
           </div>
         </div>
       )}
 
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center gap-6 mb-10">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple to-red flex items-center justify-center text-4xl relative">
+        {/* Header Consertado e Atualizado */}
+        <div className="bg-bg2 border border-border rounded-2xl p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple to-red flex items-center justify-center text-5xl relative shadow-lg">
               {characterInfo?.emoji || '⚔️'}
               {userCharacter && (
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-bg2 rounded-full flex items-center justify-center text-xs font-bold border border-purple">
+                <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-bg2 rounded-full flex items-center justify-center text-xs font-bold border-2 border-purple text-white">
                   {userCharacter.level}
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="font-bebas text-4xl tracking-wide text-text">
-                {profile?.username || 'Guerreiro'}
-              </h1>
-              <p className="text-text2">
-                {userCharacter
-                  ? `${characterInfo?.name || 'Classe'} · Nível ${userCharacter.level}`
-                  : 'Sem personagem ainda'}
-              </p>
-              {profile?.province && (
-                <p className="text-xs text-text3">📍 {profile.province}</p>
-              )}
+            
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <h1 className="font-bebas text-4xl tracking-wide text-text">
+                  {profile?.username || 'Guerreiro'}
+                </h1>
+                {profile?.title && (
+                  <span className="text-[10px] bg-amber/10 text-amber px-2 py-0.5 rounded-full border border-amber/20 uppercase font-bold tracking-wider">
+                    {profile.title}
+                  </span>
+                )}
+              </div>
+
+              {/* Bloco de Copiar ID adicionado */}
+              <div className="flex items-center gap-1.5 text-xs text-text3 bg-bg3/60 px-2 py-1 rounded-md w-fit border border-border/40">
+                <span className="font-mono">ID: {user.id.substring(0, 8)}...</span>
+                <button 
+                  onClick={copyIdToClipboard}
+                  className="hover:text-purple transition-colors p-0.5"
+                  title="Copiar ID Completo"
+                >
+                  {copied ? <Check size={14} className="text-teal" /> : <Copy size={14} />}
+                </button>
+              </div>
+
+              <div className="text-sm text-text2 flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
+                <span className="font-medium text-purple">{characterInfo?.name || 'Membro'}</span>
+                <span className="text-text3">·</span>
+                <span>Nível {userCharacter?.level || 1}</span>
+                {profile?.province && (
+                  <>
+                    <span className="text-text3">·</span>
+                    <span className="text-text3">📍 {profile.province}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Grid de Seguidores Idêntico ao Perfil Público */}
+              <div className="flex items-center gap-6 pt-3 border-t border-border/40 mt-2">
+                <div className="text-center sm:text-left">
+                  <div className="font-bebas text-xl text-text">{followerCount}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-text3">Seguidores</div>
+                </div>
+                <div className="text-center sm:text-left">
+                  <div className="font-bebas text-xl text-text">{followingCount}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-text3">Seguindo</div>
+                </div>
+                <div className="text-center sm:text-left">
+                  <div className="font-bebas text-xl text-text">
+                    {userCharacter ? (userCharacter.wins + userCharacter.losses + userCharacter.draws) : 0}
+                  </div>
+                  <div className="text-[11px] uppercase tracking-wider text-text3">Duelos</div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="md:ml-auto flex gap-3">
-            {!userCharacter && (
-              <Link to="/criar-personagem" className="btn btn-danger">
-                Criar Personagem
-              </Link>
-            )}
-            <Link to="/arena" className="btn btn-primary">
-              Duelar
+
+          <div className="flex gap-3 self-end md:self-center">
+            <Link to="/settings" className="btn btn-ghost p-3" title="Definições">
+              <Settings size={20} />
             </Link>
           </div>
         </div>
@@ -425,7 +461,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Character Stats */}
+            {/* Character Stats & Recent Duels */}
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div className="bg-bg2 border border-border rounded-2xl p-6">
                 <h3 className="font-rajdhani font-bold text-lg text-text mb-5">Atributos</h3>
@@ -453,7 +489,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Recent Duels */}
               <div className="bg-bg2 border border-border rounded-2xl p-6">
                 <div className="flex justify-between items-center mb-5">
                   <h3 className="font-rajdhani font-bold text-lg text-text">Duelos Recentes</h3>
@@ -470,10 +505,7 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-3">
                     {recentDuels.slice(0, 5).map(duel => (
-                      <div
-                        key={duel.id}
-                        className="flex items-center gap-3 p-3 bg-bg3 rounded-xl"
-                      >
+                      <div key={duel.id} className="flex items-center gap-3 p-3 bg-bg3 rounded-xl">
                         <div className="w-10 h-10 rounded-full bg-bg4 flex items-center justify-center text-lg">
                           {CLASS_INFO[duel.opponent_class]?.emoji || '⚔️'}
                         </div>
@@ -484,11 +516,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          duel.result === 'win'
-                            ? 'bg-teal/15 text-teal'
-                            : duel.result === 'loss'
-                              ? 'bg-red/15 text-red'
-                              : 'bg-amber/15 text-amber'
+                          duel.result === 'win' ? 'bg-teal/15 text-teal' : duel.result === 'loss' ? 'bg-red/15 text-red' : 'bg-amber/15 text-amber'
                         }`}>
                           {duel.result === 'win' ? 'Vitória' : duel.result === 'loss' ? 'Derrota' : 'Empate'}
                         </div>
@@ -532,4 +560,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
