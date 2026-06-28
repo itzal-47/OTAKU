@@ -146,7 +146,7 @@ export default function SearchPage() {
                   key={profile.id}
                   className="bg-slate-800/50 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between hover:border-slate-600 transition-colors"
                 >
-                  <Link to={`/profile/${profile.id}`} className="flex items-center space-x-4 flex-1">
+                  <Link to={`/perfil/${profile.username}`} className="flex items-center space-x-4 flex-1">
                     <img
                       src={profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${profile.username}`}
                       alt={profile.username}
