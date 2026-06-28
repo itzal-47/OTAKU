@@ -1,242 +1,194 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, Users, Hash, Swords, MessageCircle } from 'lucide-react';
-import { CLASS_INFO, type CharacterClass } from '../types/index';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+import { Search, UserPlus, UserCheck, Loader2, MapPin } from 'lucide-react';
 
-type SearchType = 'all' | 'users' | 'rooms' | 'posts';
-
-interface UserResult {
+interface Profile {
   id: string;
   username: string;
-  province?: string;
-  character?: {
-    name: string;
-    class: CharacterClass;
-    level: number;
-  };
-}
-
-interface RoomResult {
-  id: string;
-  name: string;
-  description?: string;
-  member_count: number;
+  avatar_url: string | null;
+  province: string | null;
+  title: string | null;
 }
 
 export default function SearchPage() {
-  const [query, setQuery] = useState('');
-  const [searchType, setSearchType] = useState<SearchType>('all');
-  const [users, setUsers] = useState<UserResult[]>([]);
-  const [rooms, setRooms] = useState<RoomResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const { user } = useAuth();
 
+  // Carrega perfis iniciais (sugestões) ou filtra por termo
   useEffect(() => {
-    const delay = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        performSearch();
+    async function fetchProfiles() {
+      setLoading(true);
+      try {
+        let query = supabase
+          .from('profiles')
+          .select('id, username, avatar_url, province, title');
+
+        if (searchTerm.trim()) {
+          // Busca parcial e insensível a maiúsculas/minúsculas
+          query = query.ilike('username', `%${searchTerm}%`);
+        } else {
+          // Se vazio, traz os últimos 15 usuários ativos/criados
+          query = query.order('created_at', { ascending: false }).limit(15);
+        }
+
+        // Evita mostrar o próprio usuário logado na busca
+        if (user) {
+          query = query.neq('id', user.id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        setProfiles(data || []);
+      } catch (err) {
+        console.error('Erro ao buscar perfis:', err);
+      } finally {
+        setLoading(false);
       }
+    }
+
+    // Debounce simples para não sobrecarregar o banco a cada letra digitada
+    const delayDebounce = setTimeout(() => {
+      fetchProfiles();
     }, 300);
 
-    return () => clearTimeout(delay);
-  }, [query, searchType]);
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm, user]);
 
-  async function performSearch() {
-    if (query.trim().length < 2) return;
+  // Carrega a lista de quem o usuário já segue
+  useEffect(() => {
+    if (!user) return;
+    async function fetchFollowing() {
+      const { data } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+      
+      if (data) {
+        setFollowingIds(data.map(f => f.following_id));
+      }
+    }
+    fetchFollowing();
+  }, [user]);
 
-    setLoading(true);
-    setSearched(true);
+  async function toggleFollow(targetId: string) {
+    if (!user) return;
+    const isFollowing = followingIds.includes(targetId);
 
     try {
-      const searchTerm = query.trim().toLowerCase();
-
-      // Search users
-      if (searchType === 'all' || searchType === 'users') {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username, province')
-          .ilike('username', `%${searchTerm}%`)
-          .limit(10);
-
-        if (profilesData && profilesData.length > 0) {
-          const userIds = profilesData.map(p => p.id);
-          const { data: charsData } = await supabase
-            .from('characters')
-            .select('user_id, name, class, level')
-            .in('user_id', userIds);
-
-          const usersWithChars: UserResult[] = profilesData.map(p => ({
-            id: p.id,
-            username: p.username,
-            province: p.province,
-            character: charsData?.find(c => c.user_id === p.id)
-          }));
-
-          setUsers(usersWithChars);
-        } else {
-          setUsers([]);
-        }
+      if (isFollowing) {
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', targetId);
+        setFollowingIds(prev => prev.filter(id => id !== targetId));
+      } else {
+        await supabase
+          .from('follows')
+          .insert({ follower_id: user.id, following_id: targetId });
+        setFollowingIds(prev => [...prev, targetId]);
       }
-
-      // Search rooms
-      if (searchType === 'all' || searchType === 'rooms') {
-        const { data: roomsData } = await supabase
-          .from('chat_rooms')
-          .select('id, name, description, created_by')
-          .ilike('name', `%${searchTerm}%`)
-          .limit(10);
-
-        if (roomsData) {
-          const roomsWithCounts = await Promise.all(
-            roomsData.map(async room => {
-              const { count } = await supabase
-                .from('chat_room_members')
-                .select('*', { count: 'exact', head: true })
-                .eq('room_id', room.id);
-              return { ...room, member_count: count || 0 };
-            })
-          );
-          setRooms(roomsWithCounts);
-        } else {
-          setRooms([]);
-        }
-      }
-
-    } catch (error) {
-      console.error('Search error:', error);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Erro ao processar follow:', err);
     }
   }
 
-  const hasResults = users.length > 0 || rooms.length > 0;
-
   return (
-    <div className="min-h-screen pt-20 pb-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Search Bar */}
-        <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text3" size={20} />
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar usuários, salas..."
-            className="input pl-12 py-4 text-lg"
-            autoFocus
-          />
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white mb-2">Descobrir Kambas</h1>
+        <p className="text-gray-400">Encontre novos otakus em Angola e faça conexões.</p>
+      </div>
+
+      {/* Barra de Busca */}
+      <div className="relative mb-8">
+        <Search className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Pesquisar por nome de usuário..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-slate-800 text-white pl-12 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500 transition-colors"
+        />
+      </div>
+
+      {/* Resultados / Sugestões */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
         </div>
-
-        {/* Type Filter */}
-        <div className="flex gap-2 mb-6">
-          {[
-            { id: 'all', label: 'Todos', icon: Search },
-            { id: 'users', label: 'Usuários', icon: Users },
-            { id: 'rooms', label: 'Salas', icon: Hash },
-          ].map(type => (
-            <button
-              key={type.id}
-              onClick={() => setSearchType(type.id as SearchType)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                searchType === type.id
-                  ? 'bg-purple/20 text-purple2 border border-purple/30'
-                  : 'text-text3 hover:text-text hover:bg-bg3 border border-transparent'
-              }`}
-            >
-              <type.icon size={16} />
-              {type.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Results */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-10 h-10 border-2 border-border2 border-t-purple rounded-full animate-spin" />
-          </div>
-        ) : !searched ? (
-          <div className="text-center py-16 text-text3">
-            <Search className="mx-auto mb-4 opacity-30" size={48} />
-            <p>Digita pelo menos 2 caracteres para buscar</p>
-          </div>
-        ) : !hasResults ? (
-          <div className="text-center py-16 text-text3">
-            <Search className="mx-auto mb-4 opacity-30" size={48} />
-            <p className="font-rajdhani font-bold text-xl text-text mb-2">Nenhum resultado</p>
-            <p className="text-sm">Tenta outros termos de busca</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Users */}
-            {(searchType === 'all' || searchType === 'users') && users.length > 0 && (
-              <div>
-                <h2 className="font-rajdhani font-bold text-lg text-text mb-3 flex items-center gap-2">
-                  <Users size={18} /> Usuários
-                </h2>
-                <div className="space-y-2">
-                  {users.map(user => (
-                    <Link
-                      key={user.id}
-                      to={`/perfil/${user.username}`}
-                      className="flex items-center gap-3 bg-bg2 border border-border rounded-xl p-4 hover:border-purple/40 transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple to-red flex items-center justify-center text-lg font-bold">
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-rajdhani font-bold text-text">@{user.username}</div>
-                        {user.character ? (
-                          <div className="text-xs text-text3 flex items-center gap-2">
-                            <span>{CLASS_INFO[user.character.class as CharacterClass]?.emoji}</span>
-                            <span>{user.character.name}</span>
-                            <span>·</span>
-                            <span>Nv. {user.character.level}</span>
-                          </div>
-                        ) : user.province ? (
-                          <div className="text-xs text-text3">📍 {user.province}</div>
-                        ) : null}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Rooms */}
-            {(searchType === 'all' || searchType === 'rooms') && rooms.length > 0 && (
-              <div>
-                <h2 className="font-rajdhani font-bold text-lg text-text mb-3 flex items-center gap-2">
-                  <Hash size={18} /> Salas de Chat
-                </h2>
-                <div className="space-y-2">
-                  {rooms.map(room => (
-                    <Link
-                      key={room.id}
-                      to="/chat"
-                      className="flex items-center gap-3 bg-bg2 border border-border rounded-xl p-4 hover:border-purple/40 transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-teal/15 flex items-center justify-center">
-                        <MessageCircle className="text-teal" size={20} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-rajdhani font-bold text-text">{room.name}</div>
-                        {room.description && (
-                          <div className="text-xs text-text3 truncate">{room.description}</div>
+      ) : (
+        <>
+          <h2 className="text-xl font-semibold text-gray-300 mb-4">
+            {searchTerm.trim() ? 'Resultados da Pesquisa' : 'Recomendados para Você'}
+          </h2>
+          
+          {profiles.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">Nenhum Kamba encontrado.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {profiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  className="bg-slate-800/50 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between hover:border-slate-600 transition-colors"
+                >
+                  <Link to={`/profile/${profile.id}`} className="flex items-center space-x-4 flex-1">
+                    <img
+                      src={profile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${profile.username}`}
+                      alt={profile.username}
+                      className="w-12 h-12 rounded-full border border-amber-500/20 bg-slate-900"
+                    />
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-white hover:text-amber-400 transition-colors">
+                          {profile.username}
+                        </span>
+                        {profile.title && (
+                          <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+                            {profile.title}
+                          </span>
                         )}
                       </div>
-                      <div className="text-xs text-text3 flex items-center gap-1">
-                        <Users size={12} />
-                        {room.member_count}
-                      </div>
-                    </Link>
-                  ))}
+                      {profile.province && (
+                        <div className="flex items-center text-xs text-gray-400 mt-1">
+                          <MapPin className="w-3 h-3 mr-1 text-red-400" />
+                          {profile.province}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+
+                  {user && (
+                    <button
+                      onClick={() => toggleFollow(profile.id)}
+                      className={`btn btn-sm ${
+                        followingIds.includes(profile.id)
+                          ? 'bg-slate-700 text-gray-300 border-none hover:bg-red-500/20 hover:text-red-400'
+                          : 'bg-amber-500 text-slate-950 border-none hover:bg-amber-400'
+                      }`}
+                    >
+                      {followingIds.includes(profile.id) ? (
+                        <>
+                          <UserCheck className="w-4 h-4 mr-1" /> Segor
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-1" /> Seguir
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
