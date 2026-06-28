@@ -171,32 +171,35 @@ export default function ClansPage() {
     const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
 
     try {
-      const { data: clanData, error: clanError } = await supabase
-        .from('clans')
-        .insert({
-          name: createForm.name,
-          tag: createForm.tag.toUpperCase(),
-          description: createForm.description,
-          min_level: createForm.min_level,
-          leader_id: user.id,
-          clan_level: 1,
-          clan_xp: 0,
-          weekly_contribution: 0,
-          status: clanStatus,
-        })
-        .select()
-        .maybeSingle();
+  const { data: clanData, error: clanError } = await supabase
+    .from('clans')
+    .insert({
+      name: createForm.name,
+      tag: createForm.tag.toUpperCase(),
+      description: createForm.description,
+      min_level: createForm.min_level,
+      leader_id: user.id,
+      clan_level: 1,
+      clan_xp: 0,
+      weekly_contribution: 0,
+      status: clanStatus,
+    })
+    .select()
+    .maybeSingle();
 
-      if (clanError) throw clanError;
-      if (!newClan) throw new Error('Erro ao criar clã — tenta novamente');  // ✅ null check após maybeSingle
+  if (clanError) throw clanError;
+  
+  // 🔽 CORREÇÃO AQUI: Mudado de !newClan para !clanData
+  if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');  
 
-      // Only add member and update count if approved
-      if (clanStatus === 'approved') {
-        await supabase.from('clan_members').insert({
-          clan_id: clanData.id,
-          user_id: user.id,
-          role: 'leader',
-        });
+  // Only add member and update count if approved
+  if (clanStatus === 'approved') {
+    await supabase.from('clan_members').insert({
+      clan_id: clanData.id, // Aqui você já estava usando o nome certo!
+      user_id: user.id,
+      role: 'leader',
+    });
+    // ... resto do código
 
         await supabase
           .from('clans')
