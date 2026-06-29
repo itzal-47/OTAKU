@@ -124,46 +124,34 @@ export default function GroupsPage() {
   }, [groups, search, selectedCategory]);
 
   async function handleCreate() {
-    if (!user) return;
-    setCreateError('');
-    if (!form.name.trim()) {
-      setCreateError('O nome do grupo é obrigatório.');
-      return;
-    }
-    setCreateLoading(true);
-    const { data: newGroup, error } = await supabase
-      .from('groups')
-      .insert({
-        name: form.name.trim(),
-        description: form.description.trim(),
-        privacy_type: form.privacy_type,
-        category: form.category,
-        rules: form.rules.trim(),
-        created_by: user.id,
-        member_count: 1,
-        post_count: 0,
-      })
-      .select()
-      .maybeSingle();
+  if (!user) return;
+  setCreateError('');
+  if (!form.name.trim()) {
+    setCreateError('O nome do grupo é obrigatório.');
+    return;
+  }
+  setCreateLoading(true);
 
-    if (error || !newGroup) {
-      setCreateError(error?.message || 'Erro ao criar grupo.');
-      setCreateLoading(false);
-      return;
-    }
-
-    await supabase.from('group_members').insert({
-      group_id: newGroup.id,
-      user_id: user.id,
-      role: 'admin',
+  const { data: newGroup, error } = await supabase
+    .rpc('create_group', {
+      p_name: form.name.trim(),
+      p_description: form.description.trim(),
+      p_privacy_type: form.privacy_type,
+      p_category: form.category,
+      p_rules: form.rules.trim(),
     });
 
-    setForm({ name: '', description: '', privacy_type: 'public', category: 'general', rules: '' });
-    setShowCreate(false);
+  if (error || !newGroup) {
+    setCreateError(error?.message || 'Erro ao criar grupo.');
     setCreateLoading(false);
-    loadGroups();
+    return;
   }
 
+  setForm({ name: '', description: '', privacy_type: 'public', category: 'general', rules: '' });
+  setShowCreate(false);
+  setCreateLoading(false);
+  loadGroups();
+}
   async function handleJoin(group: Group) {
     if (!user) return;
     if (group.privacy_type === 'public') {
