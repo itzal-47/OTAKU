@@ -171,7 +171,7 @@ export default function ClansPage() {
     const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
 
     try {
-  const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
+ const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
     try {
   const { data: clanData, error: clanError } = await supabase
     .rpc('create_clan', {
@@ -182,8 +182,8 @@ export default function ClansPage() {
       p_status: clanStatus,
     });
   if (clanError) throw clanError;
-  if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');  
-
+  if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');
+      
   // Only add member and update count if approved
   if (clanStatus === 'approved') {
     await supabase.from('clan_members').insert({
