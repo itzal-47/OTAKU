@@ -203,6 +203,7 @@ try {
     showToast('Erro ao criar clã', 'error');
   }
 }
+  }
 
   async function handleJoinRequest(clan: Clan) {
     if (!user) {
