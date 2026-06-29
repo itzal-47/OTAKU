@@ -171,25 +171,17 @@ export default function ClansPage() {
     const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
 
     try {
+  const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
+    try {
   const { data: clanData, error: clanError } = await supabase
-    .from('clans')
-    .insert({
-      name: createForm.name,
-      tag: createForm.tag.toUpperCase(),
-      description: createForm.description,
-      min_level: createForm.min_level,
-      leader_id: user.id,
-      clan_level: 1,
-      clan_xp: 0,
-      weekly_contribution: 0,
-      status: clanStatus,
-    })
-    .select()
-    .maybeSingle();
-
+    .rpc('create_clan', {
+      p_name: createForm.name,
+      p_tag: createForm.tag,
+      p_description: createForm.description,
+      p_min_level: createForm.min_level,
+      p_status: clanStatus,
+    });
   if (clanError) throw clanError;
-  
-  // 🔽 CORREÇÃO AQUI: Mudado de !newClan para !clanData
   if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');  
 
   // Only add member and update count if approved
