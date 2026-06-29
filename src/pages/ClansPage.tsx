@@ -171,38 +171,36 @@ export default function ClansPage() {
     const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
 
     try {
-  const clanStatus = isSupremeAdmin ? 'approved' : 'pending';
-try {
-  const { data: clanData, error: clanError } = await supabase
-    .rpc('create_clan', {
-      p_name: createForm.name,
-      p_tag: createForm.tag,
-      p_description: createForm.description,
-      p_min_level: createForm.min_level,
-      p_status: clanStatus,
-    });
+      const { data: clanData, error: clanError } = await supabase
+        .rpc('create_clan', {
+          p_name: createForm.name,
+          p_tag: createForm.tag,
+          p_description: createForm.description,
+          p_min_level: createForm.min_level,
+          p_status: clanStatus,
+        });
 
-  if (clanError) throw clanError;
-  if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');
+      if (clanError) throw clanError;
+      if (!clanData) throw new Error('Erro ao criar clã — tenta novamente');
 
-  if (clanStatus === 'approved') {
-    showToast('Clã criado e activado!', 'success');
-  } else {
-    showToast('Clã criado! Aguardando aprovação do Supreme Admin.', 'info');
-  }
+      if (clanStatus === 'approved') {
+        showToast('Clã criado e activado!', 'success');
+      } else {
+        showToast('Clã criado! Aguardando aprovação do Supreme Admin.', 'info');
+      }
 
-  setShowCreateModal(false);
-  setCreateForm({ name: '', tag: '', description: '', min_level: 1 });
-  loadClans();
-  loadMyClan();
-  loadLegendaryClans();
-} catch (error: any) {
-  if (error.code === '23505') {
-    showToast('Nome ou tag já existe', 'error');
-  } else {
-    showToast('Erro ao criar clã', 'error');
-  }
-}
+      setShowCreateModal(false);
+      setCreateForm({ name: '', tag: '', description: '', min_level: 1 });
+      loadClans();
+      loadMyClan();
+      loadLegendaryClans();
+    } catch (error: any) {
+      if (error.code === '23505') {
+        showToast('Nome ou tag já existe', 'error');
+      } else {
+        showToast('Erro ao criar clã', 'error');
+      }
+    }
   }
 
   async function handleJoinRequest(clan: Clan) {
