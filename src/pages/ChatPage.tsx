@@ -39,6 +39,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // Ref para allUsers para evitar stale closure no realtime
+  const allUsersRef = useRef<{id: string; username: string}[]>([]);
+
+  useEffect(() => {
+    allUsersRef.current = allUsers;
+  }, [allUsers]);
 
   useEffect(() => {
     loadRooms();
@@ -48,25 +54,42 @@ export default function ChatPage() {
   }, [user?.id]);
 
   useEffect(() => {
-    // Cleanup existing realtime channel
+    if (!selectedRoom) return;
+
+    // Cleanup canal anterior
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    const channel = supabase.channel('chat_messages');
+
+    // Nome único por sala — evita reutilização do canal antigo
+    const channelName = `chat_room_${selectedRoom.id}`;
+    const channel = supabase.channel(channelName);
     channelRef.current = channel;
-    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
-      const newMsg = payload.new as ChatMessage;
-      if (selectedRoom && newMsg.room_id === selectedRoom.id) {
+
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `room_id=eq.${selectedRoom.id}` // filtra só esta sala no servidor
+      },
+      (payload) => {
+        const newMsg = payload.new as ChatMessage;
         setMessages(prev => {
+          // Ignora se já existe (ex: mensagem própria adicionada optimisticamente)
           if (prev.some(m => m.id === newMsg.id)) return prev;
-          // Look up username from allUsers for real-time messages
-          const sender = allUsers.find(u => u.id === newMsg.user_id);
-          return [...prev, { ...newMsg, username: sender?.username || 'Unknown' }];
+          // Usa allUsersRef para evitar stale closure
+          const sender = allUsersRef.current.find(u => u.id === newMsg.user_id);
+          const username = newMsg.username || sender?.username || 'Unknown';
+          return [...prev, { ...newMsg, username }];
         });
       }
-    });
+    );
+
     channel.subscribe();
+
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -264,17 +287,46 @@ export default function ChatPage() {
     if (!newMessage.trim() || !user || !selectedRoom) return;
 
     setSending(true);
+    const content = newMessage.trim();
+    const username = profile?.username || allUsersRef.current.find(u => u.id === user.id)?.username || 'Unknown';
+
+    // Update optimista — mensagem aparece imediatamente sem esperar pelo realtime
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      room_id: selectedRoom.id,
+      user_id: user.id,
+      username,
+      content,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setNewMessage('');
 
     try {
-      const { error } = await supabase.from('chat_messages').insert({
-        room_id: selectedRoom.id,
-        user_id: user.id,
-        content: newMessage.trim()
-      });
+      const { data: inserted, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          room_id: selectedRoom.id,
+          user_id: user.id,
+          username, // gravar username directamente na tabela
+          content,
+        })
+        .select('id')
+        .maybeSingle();
 
       if (error) throw error;
-      setNewMessage('');
+
+      // Substituir mensagem temporária pelo id real
+      if (inserted) {
+        setMessages(prev =>
+          prev.map(m => m.id === tempId ? { ...m, id: inserted.id } : m)
+        );
+      }
     } catch {
+      // Remover mensagem optimista se falhar
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setNewMessage(content);
       showToast('Erro ao enviar mensagem', 'error');
     } finally {
       setSending(false);
