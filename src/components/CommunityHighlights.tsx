@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Trophy, Mic, Music, Swords, Users, Flame, Crown, TrendingUp } from 'lucide-react';
+import { Mic, Music, Swords, Users, Crown, TrendingUp } from 'lucide-react';
+
+// Função utilitária para garantir que o tempo de cache/semana está correto
+// Substitui pela tua implementação real se ela for diferente
+const getWeekStart = () => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff)).toISOString();
+};
 
 interface Highlight {
   type: string;
@@ -30,22 +38,19 @@ export default function CommunityHighlights() {
 
   async function loadHighlights() {
     try {
+      setLoading(true);
       const weekStart = getWeekStart();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('community_highlights')
         .select('*')
-        .eq('week_start', weekStart.toISOString().split('T')[0]);
+        .gte('created_at', weekStart);
 
-      if (data && data.length > 0) {
-        setHighlights(data);
-        loadDetails(data);
-      } else {
-        // Generate highlights on the fly
-        await generateHighlights();
-        loadHighlights();
-      }
-    } catch (e) {
-      console.error('Error loading highlights:', e);
+      if (error) throw error;
+      
+      setHighlights(data || []);
+      if (data) await loadDetails(data);
+    } catch (error) {
+      console.error('Erro detalhado ao carregar destaques:', error);
     } finally {
       setLoading(false);
     }
@@ -54,122 +59,41 @@ export default function CommunityHighlights() {
   async function loadDetails(highlightsData: Highlight[]) {
     const newDetails: Record<string, any> = {};
 
-    for (const h of highlightsData) {
-      if (!h.entity_id) continue;
+    const userIds = [...new Set(highlightsData.filter(h => h.entity_type === 'user').map(h => h.entity_id))];
+    const clanIds = [...new Set(highlightsData.filter(h => h.entity_type === 'clan').map(h => h.entity_id))];
+    const charIds = [...new Set(highlightsData.filter(h => h.entity_type === 'character').map(h => h.entity_id))];
 
-      try {
-        if (h.entity_type === 'user') {
-          const { data } = await supabase
-            .from('profiles')
-            .select('id, username, title')
-            .eq('id', h.entity_id)
-            .single();
-          newDetails[h.type] = data;
-        } else if (h.entity_type === 'clan') {
-          const { data } = await supabase
-            .from('clans')
-            .select('id, name, tag')
-            .eq('id', h.entity_id)
-            .single();
-          newDetails[h.type] = data;
-        } else if (h.entity_type === 'character') {
-          const { data } = await supabase
-            .from('characters')
-            .select('id, name, class, wins')
-            .eq('id', h.entity_id)
-            .single();
-          newDetails[h.type] = data;
-        }
-      } catch {}
-    }
+    try {
+      const [usersRes, clansRes, charsRes] = await Promise.all([
+        userIds.length > 0 ? supabase.from('profiles').select('id, username').in('id', userIds) : { data: [] },
+        clanIds.length > 0 ? supabase.from('clans').select('id, name, tag').in('id', clanIds) : { data: [] },
+        charIds.length > 0 ? supabase.from('characters').select('id, name').in('id', charIds) : { data: [] }
+      ]);
 
-    setDetails(newDetails);
-  }
-
-  async function generateHighlights() {
-    // Kamba do Dia - user with most activity
-    const { data: activeUsers } = await supabase
-      .from('posts')
-      .select('user_id, profiles(username, id, title)')
-      .gte('created_at', getWeekStart().toISOString());
-
-    if (activeUsers && activeUsers.length > 0) {
-      const userCounts: Record<string, any> = {};
-      activeUsers.forEach(p => {
-        if (!userCounts[p.user_id]) userCounts[p.user_id] = { count: 0, profile: p.profiles };
-        userCounts[p.user_id].count++;
+      highlightsData.forEach(h => {
+        if (!h.entity_id) return;
+        
+        let found = null;
+        if (h.entity_type === 'user') found = usersRes.data?.find((u: any) => u.id === h.entity_id);
+        else if (h.entity_type === 'clan') found = clansRes.data?.find((c: any) => c.id === h.entity_id);
+        else if (h.entity_type === 'character') found = charsRes.data?.find((ch: any) => ch.id === h.entity_id);
+        
+        if (found) newDetails[h.type] = found;
       });
 
-      const topUser = Object.entries(userCounts).sort((a, b) => b[1].count - a[1].count)[0];
-      if (topUser) {
-        await supabase.from('community_highlights').upsert({
-          highlight_type: 'kamba_do_dia',
-          entity_id: topUser[0],
-          entity_type: 'user',
-          score: topUser[1].count,
-          week_start: getWeekStart().toISOString().split('T')[0]
-        }, { onConflict: 'highlight_type,week_start' });
-      }
-    }
-
-    // Guerreiro #1 - top duelist
-    const { data: topDuelist } = await supabase
-      .from('characters')
-      .select('id, user_id, name, wins, profiles(id, username)')
-      .order('wins', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (topDuelist) {
-      const profileData = Array.isArray(topDuelist.profiles) ? topDuelist.profiles[0] : topDuelist.profiles;
-      await supabase.from('community_highlights').upsert({
-        highlight_type: 'guerreiro_semana',
-        entity_id: topDuelist.id,
-        entity_type: 'character',
-        score: topDuelist.wins,
-        metadata: { name: topDuelist.name, username: profileData?.username },
-        week_start: getWeekStart().toISOString().split('T')[0]
-      }, { onConflict: 'highlight_type,week_start' });
-    }
-
-    // Clan da Semana
-    const { data: topClan } = await supabase
-      .from('clans')
-      .select('id, name, tag, weekly_contribution')
-      .order('weekly_contribution', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (topClan) {
-      await supabase.from('community_highlights').upsert({
-        highlight_type: 'cla_da_semana',
-        entity_id: topClan.id,
-        entity_type: 'clan',
-        score: topClan.weekly_contribution || 0,
-        metadata: { name: topClan.name, tag: topClan.tag },
-        week_start: getWeekStart().toISOString().split('T')[0]
-      }, { onConflict: 'highlight_type,week_start' });
+      setDetails(newDetails);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes das entidades:', error);
     }
   }
 
-  function getWeekStart(): Date {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(now.setDate(diff));
-  }
-
-  if (loading || highlights.length === 0) return null;
+  if (loading) return <div className="text-text3 text-sm">A carregar destaques...</div>;
 
   return (
-    <div className="bg-bg2 border border-border rounded-2xl p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Flame className="text-amber" size={20} />
-        <h2 className="font-rajdhani font-bold text-lg text-text">Destaques da Semana</h2>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {highlights.slice(0, 4).map(h => {
+    <div className="space-y-4">
+      <h2 className="text-lg font-bold text-text">Destaques da Comunidade</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {highlights.map((h) => {
           const config = HIGHLIGHT_CONFIG[h.type];
           if (!config) return null;
 
@@ -177,15 +101,10 @@ export default function CommunityHighlights() {
           const detail = details[h.type];
 
           return (
-            <div
-              key={h.type}
-              className="bg-bg3 rounded-xl p-3 hover:bg-bg4 transition-colors cursor-pointer group"
-            >
+            <div key={h.type} className="bg-bg3 rounded-xl p-3 hover:bg-bg4 transition-colors cursor-pointer group">
               <div className="flex items-center gap-2 mb-2">
                 <Icon size={14} className={`text-${config.color}`} />
-                <span className="text-xs text-text3 uppercase tracking-wide">
-                  {config.label}
-                </span>
+                <span className="text-xs text-text3 uppercase tracking-wide">{config.label}</span>
               </div>
 
               {detail || h.metadata ? (
@@ -193,9 +112,7 @@ export default function CommunityHighlights() {
                   <span className="font-semibold text-sm text-text truncate block">
                     {h.metadata?.name || detail?.username || detail?.name || '...'}
                   </span>
-                  {h.metadata?.tag && (
-                    <span className="text-xs text-purple">[{h.metadata.tag}]</span>
-                  )}
+                  {h.metadata?.tag && <span className="text-xs text-purple">[{h.metadata.tag}]</span>}
                   {h.type === 'guerreiro_semana' && (
                     <span className="text-xs text-amber flex items-center gap-1 mt-1">
                       <TrendingUp size={10} /> {h.score} vitórias
@@ -203,7 +120,7 @@ export default function CommunityHighlights() {
                   )}
                 </div>
               ) : (
-                <span className="text-sm text-text3">Em breve...</span>
+                <span className="text-sm text-text3">A processar...</span>
               )}
             </div>
           );
