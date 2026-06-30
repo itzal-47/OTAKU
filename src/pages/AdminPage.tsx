@@ -6,6 +6,8 @@ import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
 import { Shield, Users, Check, X, Plus, Trash2, MessageCircle, Calendar, AlertTriangle, Flag, Crown, ShieldCheck } from 'lucide-react';
 import type { CharacterClass } from '../types/index';
+import { SkeletonAvatarLineList } from '../components/Skeleton';
+import { handleError } from '../lib/errorHandler';
 
 interface ChatRoomRequest {
   id: string;
@@ -249,7 +251,7 @@ export default function AdminPage() {
         }
       }
     } catch (error) {
-      console.error('Error loading admin data:', error);
+      handleError(error, showToast, { context: 'carregar dados de administração' });
     } finally {
       setLoading(false);
     }
@@ -299,8 +301,8 @@ export default function AdminPage() {
 
       showToast('Sala aprovada!', 'success');
       loadData();
-    } catch {
-      showToast('Erro ao aprovar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'aprovar sala' });
     }
   }
 
@@ -318,79 +320,47 @@ export default function AdminPage() {
 
       showToast('Pedido recusado', 'info');
       loadData();
-    } catch {
-      showToast('Erro ao recusar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'recusar pedido' });
     }
   }
 
   async function handleApproveAdminRequest(requestId: string, userId: string) {
     try {
-      await supabase.from('admin_list').insert({
-        user_id: userId,
-        added_by: user?.id
-      });
-      await supabase.from('admin_requests').update({
-        status: 'approved',
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      }).eq('id', requestId);
+      await supabase.from('admin_list').insert({ user_id: userId, added_by: user?.id });
+      await supabase.from('admin_requests').update({ status: 'approved', reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', requestId);
       await supabase.from('profiles').update({ is_admin: true, is_event_publisher: true }).eq('id', userId);
       showToast('Pedido de admin aprovado!', 'success');
       loadData();
-    } catch {
-      showToast('Erro ao aprovar pedido', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'aprovar pedido de admin' });
     }
   }
 
   async function handleRejectAdminRequest(requestId: string) {
     try {
-      await supabase.from('admin_requests').update({
-        status: 'rejected',
-        reviewed_by: user?.id,
-        reviewed_at: new Date().toISOString()
-      }).eq('id', requestId);
+      await supabase.from('admin_requests').update({ status: 'rejected', reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', requestId);
       showToast('Pedido de admin rejeitado', 'info');
       loadData();
-    } catch {
-      showToast('Erro ao rejeitar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'rejeitar pedido de admin' });
     }
   }
 
   async function handleAddAdmin() {
     if (!newAdminUsername.trim()) return;
-
     setAddingAdmin(true);
     try {
-      // Find user by username
-      const { data: targetProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', newAdminUsername.trim())
-        .maybeSingle();
-
-      if (!targetProfile) {
-        showToast('Usuário não encontrado', 'error');
-        return;
-      }
-
-      const { error } = await supabase.from('admin_list').insert({
-        user_id: targetProfile.id,
-        added_by: user?.id
-      });
-
+      const { data: targetProfile } = await supabase.from('profiles').select('id').eq('username', newAdminUsername.trim()).maybeSingle();
+      if (!targetProfile) { showToast('Utilizador não encontrado', 'error'); return; }
+      const { error } = await supabase.from('admin_list').insert({ user_id: targetProfile.id, added_by: user?.id });
       if (error) throw error;
-
-      // Also update their profile to be event publisher
-      await supabase
-        .from('profiles')
-        .update({ is_admin: true, is_event_publisher: true })
-        .eq('id', targetProfile.id);
-
+      await supabase.from('profiles').update({ is_admin: true, is_event_publisher: true }).eq('id', targetProfile.id);
       showToast('Admin adicionado!', 'success');
       setNewAdminUsername('');
       loadData();
-    } catch {
-      showToast('Erro ao adicionar admin', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'adicionar admin', codeMessages: { '23505': 'Este utilizador já é admin.' } });
     } finally {
       setAddingAdmin(false);
     }
@@ -402,68 +372,40 @@ export default function AdminPage() {
       await supabase.from('profiles').update({ is_admin: false, is_event_publisher: false }).eq('id', adminUserId);
       showToast('Admin removido', 'info');
       loadData();
-    } catch {
-      showToast('Erro ao remover', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'remover admin' });
     }
   }
 
   async function handleReportAction(reportId: string, action: 'resolved' | 'dismissed') {
     try {
-      await supabase
-        .from('reports')
-        .update({
-          status: action,
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', reportId);
-
+      await supabase.from('reports').update({ status: action, reviewed_by: user?.id, reviewed_at: new Date().toISOString() }).eq('id', reportId);
       showToast(`Relatório ${action === 'resolved' ? 'resolvido' : 'ignorado'}`, 'success');
       loadData();
-    } catch {
-      showToast('Erro ao processar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'processar relatório' });
     }
   }
 
   async function handleApproveClan(clanId: string, leaderId: string) {
     try {
-      // Update clan status
-      await supabase
-        .from('clans')
-        .update({ status: 'approved' })
-        .eq('id', clanId);
-
-      // Add leader to clan_members
-      await supabase.from('clan_members').insert({
-        clan_id: clanId,
-        user_id: leaderId,
-        role: 'leader',
-      });
-
-      // Update clan member count
-      await supabase
-        .from('clans')
-        .update({ total_members: 1 })
-        .eq('id', clanId);
-
+      await supabase.from('clans').update({ status: 'approved' }).eq('id', clanId);
+      await supabase.from('clan_members').insert({ clan_id: clanId, user_id: leaderId, role: 'leader' });
+      await supabase.from('clans').update({ total_members: 1 }).eq('id', clanId);
       showToast('Clã aprovado!', 'success');
       loadData();
-    } catch {
-      showToast('Erro ao aprovar clã', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'aprovar clã' });
     }
   }
 
   async function handleRejectClan(clanId: string) {
     try {
-      await supabase
-        .from('clans')
-        .update({ status: 'rejected' })
-        .eq('id', clanId);
-
+      await supabase.from('clans').update({ status: 'rejected' }).eq('id', clanId);
       showToast('Clã rejeitado', 'info');
       loadData();
-    } catch {
-      showToast('Erro ao rejeitar clã', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'rejeitar clã' });
     }
   }
 
@@ -530,7 +472,9 @@ export default function AdminPage() {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-12 h-12 border-2 border-border2 border-t-purple rounded-full animate-spin" />
+            <div className="space-y-3">
+              <SkeletonAvatarLineList count={4} />
+            </div>
           </div>
         ) : (
           <>
