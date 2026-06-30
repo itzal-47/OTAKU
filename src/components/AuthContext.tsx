@@ -58,62 +58,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Evita pedidos duplicados simultâneos
   const fetchingRef = useRef(false);
 
-  const activeRequestRef = useRef(0);
-
-const loadUserData = async (
-userId:string
-)=>{
-
-const requestId=
-++activeRequestRef.current;
-
-try{
-
-const [
-
-prof,
-char
-
-]=await Promise.all([
-
-fetchProfileById(userId),
-
-fetchCharacterByUserId(userId)
-
-]);
-
-if(
-requestId
-!==activeRequestRef.current
-){
-
-return;
-
-}
-
-setProfile(
-prof ?? null
-);
-
-setCharacter(
-char ?? null
-);
-
-}
-catch(err){
-
-console.error(
-"Erro carregar perfil",
-err
-);
-
-setProfile(null);
-
-setCharacter(null);
-
-}
-
-};
+  const loadUserData = async (userId: string) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const prof = await fetchProfileById(userId);
+      setProfile(prof);
+      const char = await fetchCharacterByUserId(userId);
+      setCharacter(char);
+    } finally {
+      fetchingRef.current = false;
+    }
+  };
 
   const refreshProfile = async () => {
     if (!user) return;
@@ -135,15 +91,9 @@ setCharacter(null);
           sessionStorage.setItem('otakukamba-just-logged-in', 'true');
         }
 
-        f(session?.user){
-
-queueMicrotask(
-()=>loadUserData(
-session.user.id
-)
-);
-
-} else {
+        if (session?.user) {
+          await loadUserData(session.user.id);
+        } else {
           setProfile(null);
           setCharacter(null);
         }
@@ -201,28 +151,13 @@ session.user.id
   };
 
   // ─── signOut ──────────────────────────────────────────────────────────────
- const signOut = async()=>{
-
-try{
-
-await supabase.auth.signOut();
-
-}
-finally{
-
-activeRequestRef.current++;
-
-setUser(null);
-
-setProfile(null);
-
-setCharacter(null);
-
-setSession(null);
-
-}
-
-};
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setCharacter(null);
+    setSession(null);
+  };
 
   return (
     <AuthContext.Provider
