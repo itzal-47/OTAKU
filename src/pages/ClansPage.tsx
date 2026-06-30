@@ -74,11 +74,13 @@ function ClanCard({ clan, myClanId, onJoin, onOpen }: { clan: ClanWithStats; myC
 
 function ClanWarRoom({
   clan, members, requests, contributions, myRole, currentUserId,
+  membersHasMore, membersLoadingMore, onLoadMoreMembers,
   onBack, onJoinRequest, onAccept, onReject, onPromote, onKick, onLeave,
 }: {
   clan: Clan & { clan_xp?: number; weekly_contribution?: number };
   members: ClanMember[]; requests: ClanRequest[]; contributions: ClanContribution[];
   myRole?: string; currentUserId?: string;
+  membersHasMore?: boolean; membersLoadingMore?: boolean; onLoadMoreMembers?: () => void;
   onBack: () => void; onJoinRequest: () => void;
   onAccept: (id: string, uid: string) => void; onReject: (id: string) => void;
   onPromote: (id: string) => void; onKick: (id: string) => void; onLeave: () => void;
@@ -227,6 +229,15 @@ function ClanWarRoom({
                 </div>
               </div>
             ))}
+            {membersHasMore && (
+              <button
+                onClick={onLoadMoreMembers}
+                disabled={membersLoadingMore}
+                className="w-full py-2.5 text-xs font-semibold text-amber hover:bg-bg3 rounded-xl transition-colors disabled:opacity-50"
+              >
+                {membersLoadingMore ? 'Carregando...' : 'Carregar mais membros'}
+              </button>
+            )}
           </div>
         )}
 
@@ -288,6 +299,10 @@ export default function ClansPage() {
   const [activeClanId, setActiveClanId] = useState<string | null>(null);
   const [myClan, setMyClan] = useState<ClanMember | null>(null);
   const [clanMembers, setClanMembers] = useState<ClanMember[]>([]);
+  const [membersOffset, setMembersOffset] = useState(0);
+  const [membersHasMore, setMembersHasMore] = useState(true);
+  const [membersLoadingMore, setMembersLoadingMore] = useState(false);
+  const MEMBERS_PAGE_SIZE = 25;
   const [clanRequests, setClanRequests] = useState<ClanRequest[]>([]);
   const [clanContributions, setClanContributions] = useState<ClanContribution[]>([]);
   const [createForm, setCreateForm] = useState({ name: '', tag: '', description: '', min_level: 1 });
@@ -315,13 +330,28 @@ export default function ClansPage() {
 
   async function loadClanDetails(clanId: string) {
     const [membersRes, requestsRes, contribRes] = await Promise.all([
-      supabase.from('clan_members').select('*, user:profiles(id, username, province), character:characters(name, class, level)').eq('clan_id', clanId).order('joined_at', { ascending: true }),
+      supabase.from('clan_members').select('*, user:profiles(id, username, province), character:characters(name, class, level)').eq('clan_id', clanId).order('joined_at', { ascending: true }).range(0, MEMBERS_PAGE_SIZE - 1),
       supabase.from('clan_requests').select('*, user:profiles(id, username)').eq('clan_id', clanId).eq('status', 'pending'),
       supabase.from('clan_contributions').select('*, user:profiles(username)').eq('clan_id', clanId).order('created_at', { ascending: false }).limit(30),
     ]);
     setClanMembers(membersRes.data || []);
+    setMembersOffset(membersRes.data?.length || 0);
+    setMembersHasMore((membersRes.data?.length || 0) === MEMBERS_PAGE_SIZE);
     setClanRequests(requestsRes.data || []);
     setClanContributions(contribRes.data || []);
+  }
+
+  async function loadMoreMembers() {
+    if (!activeClanId || membersLoadingMore || !membersHasMore) return;
+    setMembersLoadingMore(true);
+    const { data } = await supabase.from('clan_members')
+      .select('*, user:profiles(id, username, province), character:characters(name, class, level)')
+      .eq('clan_id', activeClanId).order('joined_at', { ascending: true })
+      .range(membersOffset, membersOffset + MEMBERS_PAGE_SIZE - 1);
+    setClanMembers(prev => [...prev, ...(data || [])]);
+    setMembersOffset(prev => prev + (data?.length || 0));
+    setMembersHasMore((data?.length || 0) === MEMBERS_PAGE_SIZE);
+    setMembersLoadingMore(false);
   }
 
   async function handleCreateClan(e: React.FormEvent) {
@@ -430,6 +460,7 @@ export default function ClansPage() {
     return (
       <ClanWarRoom
         clan={activeClan} members={clanMembers} requests={clanRequests} contributions={clanContributions}
+        membersHasMore={membersHasMore} membersLoadingMore={membersLoadingMore} onLoadMoreMembers={loadMoreMembers}
         myRole={myClan?.clan_id === activeClan.id ? myClan.role : undefined} currentUserId={user?.id}
         onBack={() => setActiveClanId(null)} onJoinRequest={() => handleJoinRequest(activeClan)}
         onAccept={handleAcceptRequest} onReject={handleRejectRequest}
