@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../components/ToastContext';
 import { CLASS_INFO, ANGOLAN_PROVINCES, type CharacterClass } from '../types/index';
 import { Trophy, Medal, Crown, Globe, TrendingUp, Zap, Shield, Target } from 'lucide-react';
+import { handleError } from '../lib/errorHandler';
 
 interface RankingEntry {
   rank: number;
@@ -23,6 +25,7 @@ type TabType = 'nacional' | 'provincia' | 'internacional';
 type SortType = 'wins' | 'level' | 'xp' | 'winrate';
 
 export default function RankingsPage() {
+  const { showToast } = useToast();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('nacional');
@@ -108,7 +111,7 @@ export default function RankingsPage() {
         setRankings([]);
       }
     } catch (error) {
-      console.error('Error loading rankings:', error);
+      handleError(error, showToast, { context: 'carregar rankings' });
     } finally {
       setLoading(false);
     }
@@ -159,7 +162,7 @@ export default function RankingsPage() {
             }`}
           >
             <Trophy size={16} />
-            🇦🇴 Nacional
+            ð¦ð´ Nacional
           </button>
           <button
             onClick={() => setActiveTab('provincia')}
@@ -169,7 +172,7 @@ export default function RankingsPage() {
                 : 'text-text3 hover:text-text hover:bg-bg3'
             }`}
           >
-            📍 Por Província
+            ð Por ProvÃ­ncia
           </button>
           <button
             onClick={() => setActiveTab('internacional')}
@@ -180,7 +183,7 @@ export default function RankingsPage() {
             }`}
           >
             <Globe size={16} />
-            🌍 Internacional
+            ð Internacional
           </button>
         </div>
 
@@ -190,12 +193,12 @@ export default function RankingsPage() {
             <Globe className="mx-auto mb-6 text-purple2 opacity-30" size={80} />
             <h2 className="font-bebas text-4xl text-text mb-4">BREVEMENTE</h2>
             <p className="text-text2 max-w-md mx-auto mb-6">
-              Os rankings internacionais estarão disponíveis em breve.
+              Os rankings internacionais estarÃ£o disponÃ­veis em breve.
               Por agora, domina Angola primeiro!
             </p>
             <div className="inline-flex items-center gap-2 bg-purple/10 border border-purple/30 rounded-xl px-4 py-2 text-sm text-purple2">
-              <span>🇦🇴</span>
-              <span>Disponível apenas em Angola por agora</span>
+              <span>ð¦ð´</span>
+              <span>DisponÃ­vel apenas em Angola por agora</span>
             </div>
           </div>
         ) : (
@@ -205,8 +208,8 @@ export default function RankingsPage() {
               {/* Sort By */}
               <div className="flex gap-1 bg-bg3 rounded-lg p-1">
                 {[
-                  { id: 'wins', label: 'Vitórias', icon: Trophy },
-                  { id: 'level', label: 'Nível', icon: TrendingUp },
+                  { id: 'wins', label: 'VitÃ³rias', icon: Trophy },
+                  { id: 'level', label: 'NÃ­vel', icon: TrendingUp },
                   { id: 'xp', label: 'XP', icon: Zap },
                   { id: 'winrate', label: 'Win Rate', icon: Target },
                 ].map(sort => (
@@ -229,9 +232,9 @@ export default function RankingsPage() {
                   onChange={e => setFilterProvince(e.target.value)}
                   className="bg-bg3 border border-border2 rounded-lg px-4 py-2 text-sm text-text2"
                 >
-                  <option value="all">🇦🇴 Toda Angola</option>
+                  <option value="all">ð¦ð´ Toda Angola</option>
                   {ANGOLAN_PROVINCES.map(prov => (
-                    <option key={prov} value={prov}>📍 {prov}</option>
+                    <option key={prov} value={prov}>ð {prov}</option>
                   ))}
                 </select>
               )}
@@ -241,7 +244,7 @@ export default function RankingsPage() {
                 onChange={e => setFilterClass(e.target.value)}
                 className="bg-bg3 border border-border2 rounded-lg px-4 py-2 text-sm text-text2"
               >
-                <option value="all">⚔️ Todas as Classes</option>
+                <option value="all">âï¸ Todas as Classes</option>
                 {(Object.entries(CLASS_INFO) as [CharacterClass, typeof CLASS_INFO.ninja][]).map(([key, info]) => (
                   <option key={key} value={key}>
                     {info.emoji} {info.name}
@@ -251,8 +254,26 @@ export default function RankingsPage() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-12 h-12 border-2 border-border2 border-t-purple rounded-full animate-spin" />
+              <div className="space-y-3">
+                {/* Top 3 skeleton */}
+                <div className="grid md:grid-cols-3 gap-4 mb-8">
+                  {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-bg2 border border-border rounded-2xl animate-pulse" />)}
+                </div>
+                {/* List skeleton */}
+                <div className="bg-bg2 border border-border rounded-2xl overflow-hidden">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 border-b border-border animate-pulse">
+                      <div className="w-10 h-5 bg-bg3 rounded" />
+                      <div className="w-12 h-12 bg-bg3 rounded-xl" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3.5 bg-bg3 rounded w-32" />
+                        <div className="h-2.5 bg-bg3 rounded w-20" />
+                      </div>
+                      <div className="w-10 h-5 bg-bg3 rounded hidden md:block" />
+                      <div className="w-10 h-5 bg-bg3 rounded" />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : rankings.length === 0 ? (
               <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
@@ -261,7 +282,7 @@ export default function RankingsPage() {
                 <p className="text-text3 text-sm">
                   {activeTab === 'provincia' && filterProvince !== 'all'
                     ? `Nenhum guerreiro registado em ${filterProvince} ainda.`
-                    : 'Os duelos ainda não começaram. Sê o primeiro a lutar!'}
+                    : 'Os duelos ainda nÃ£o comeÃ§aram. SÃª o primeiro a lutar!'}
                 </p>
               </div>
             ) : (
@@ -282,7 +303,7 @@ export default function RankingsPage() {
                           <div className="relative">
                             <div className="flex items-center gap-2 mb-4">
                               <div className={`w-10 h-10 rounded-xl bg-${info?.color || 'purple'}/15 flex items-center justify-center text-xl`}>
-                                {info?.emoji || '⚔️'}
+                                {info?.emoji || 'âï¸'}
                               </div>
                               <div className="flex-1">
                                 <div className="font-bebas text-lg tracking-wide text-text">#{idx + 1}</div>
@@ -295,13 +316,13 @@ export default function RankingsPage() {
                               {entry.username}
                             </div>
                             <div className="text-xs text-text3 mb-4">
-                              {entry.character_name} · {info?.name || 'Classe'} Nv.{entry.level}
+                              {entry.character_name} Â· {info?.name || 'Classe'} Nv.{entry.level}
                             </div>
 
                             <div className="flex justify-between text-xs">
                               <div>
                                 <div className="text-amber font-bold">{entry.wins}</div>
-                                <div className="text-text3">Vitórias</div>
+                                <div className="text-text3">VitÃ³rias</div>
                               </div>
                               <div>
                                 <div className="text-red font-bold">{entry.losses}</div>
@@ -334,12 +355,12 @@ export default function RankingsPage() {
                               #{entry.rank}
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-bg3 flex items-center justify-center text-xl">
-                              {info?.emoji || '⚔️'}
+                              {info?.emoji || 'âï¸'}
                             </div>
                             <div className="flex-1">
                               <div className="font-rajdhani font-bold text-text">{entry.username}</div>
                               <div className="text-xs text-text3">
-                                {entry.character_name} · {info?.name || 'Classe'}
+                                {entry.character_name} Â· {info?.name || 'Classe'}
                               </div>
                             </div>
                             <div className="hidden md:flex items-center gap-4 text-xs">
@@ -353,7 +374,7 @@ export default function RankingsPage() {
                               </div>
                             </div>
                             <div className="hidden sm:block text-xs text-text2">
-                              📍 {entry.province || entry.city || 'Angola'}
+                              ð {entry.province || entry.city || 'Angola'}
                             </div>
                             <div className="text-right">
                               <div className="text-sm font-bold text-amber">{entry.wins}W</div>
