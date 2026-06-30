@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { prepareMediaForUpload } from '../lib/imageCompress';
 import { useAuth } from '../components/AuthContext';
 import { Link } from 'react-router-dom';
 import {
@@ -198,9 +199,10 @@ function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreat
     if (!file || !user) return;
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop();
+      const prepared = await prepareMediaForUpload(file, { maxWidth: 400, maxHeight: 400, quality: 0.85 });
+      const ext = prepared.name.split('.').pop();
       const path = `groups/avatars/${user.id}_${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('uploads').upload(path, file);
+      const { error: upErr } = await supabase.storage.from('uploads').upload(path, prepared);
       if (upErr) throw upErr;
       const { data } = supabase.storage.from('uploads').getPublicUrl(path);
       setAvatarUrl(data.publicUrl);
