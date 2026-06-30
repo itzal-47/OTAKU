@@ -4,6 +4,7 @@ import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
 import { Plus, X, Eye, Clock, ChevronLeft, ChevronRight, Send, Trash2, Image as ImageIcon, Video, Pause, Play } from 'lucide-react';
 import { CLASS_INFO, type CharacterClass } from '../types/index';
+import { prepareMediaForUpload } from '../lib/imageCompress';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -509,17 +510,18 @@ function CreateStoryModal({ currentUser, onClose, onCreated }: {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
     if (file.size > 50 * 1024 * 1024) { showToast('Ficheiro muito grande (máx 50MB)', 'error'); return; }
-    const ext = file.name.split('.').pop();
-    const path = `stories/${currentUser.id}/${Date.now()}.${ext}`;
     const type = file.type.startsWith('video') ? 'video' : 'image';
     setMediaType(type);
     setUploading(true);
     try {
-      const { error } = await supabase.storage.from('uploads').upload(path, file);
+      const prepared = await prepareMediaForUpload(file, { maxWidth: 1280, maxHeight: 1280, quality: 0.82 });
+      const ext = prepared.name.split('.').pop();
+      const path = `stories/${currentUser.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('uploads').upload(path, prepared);
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
       setMediaUrl(publicUrl);
-    } catch { showToast('Erro no upload', 'error'); }
+    } catch (err: any) { showToast(err?.message || 'Erro no upload', 'error'); }
     finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
   }
 
@@ -643,7 +645,8 @@ export default function StoriesPage() {
       let query = supabase.from('stories')
         .select('id, user_id, media_url, media_type, thumbnail_url, views_count, created_at, expires_at')
         .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(300); // segurança — momentos já são auto-limitados a 24h, isto evita picos enormes
 
       const { data: storiesData } = await query;
       if (!storiesData || storiesData.length === 0) { setGroups([]); return; }
