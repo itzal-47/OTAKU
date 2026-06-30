@@ -11,6 +11,7 @@ import {
 import { CLASS_INFO, type CharacterClass } from '../types/index';
 import StoriesBar from '../components/StoriesBar';
 import GuestCTA from '../components/GuestCTA';
+import { prepareMediaForUpload } from '../lib/imageCompress';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -563,16 +564,20 @@ function PostComposer({ currentUser, currentProfile, onPosted, showToast }: {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
     if (file.size > 50 * 1024 * 1024) { showToast('Ficheiro muito grande (máx 50MB)', 'error'); return; }
-    const ext = file.name.split('.').pop();
-    const path = `posts/${currentUser.id}/${Date.now()}.${ext}`;
     setUploading(true);
     try {
-      const { error } = await supabase.storage.from('uploads').upload(path, file);
+      const prepared = await prepareMediaForUpload(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.8 });
+      const ext = prepared.name.split('.').pop();
+      const path = `posts/${currentUser.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('uploads').upload(path, prepared);
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
       setMediaUrl(publicUrl);
-      showToast('Media carregada! ✓', 'success');
-    } catch { showToast('Erro no upload', 'error'); } finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+      const savedKb = Math.round((file.size - prepared.size) / 1024);
+      showToast(savedKb > 50 ? `Media carregada! (-${savedKb}KB) ✓` : 'Media carregada! ✓', 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Erro no upload', 'error');
+    } finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
   }
 
   async function handlePost(e: React.FormEvent) {
