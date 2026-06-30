@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
+import { prepareMediaForUpload } from '../lib/imageCompress';
 import {
   Users, Crown, Lock, Globe2, EyeOff, Share2, UserPlus, LogOut, Settings,
   Image as ImageIcon, Heart, MessageCircle, Pin, Trash2, CheckCircle2, X,
@@ -559,10 +560,17 @@ export default function GroupDetailPage() {
     let mediaType: string | null = null;
     if (postFile) {
       mediaType = postFile.type.startsWith('video') ? 'video' : 'image';
-      const ext = postFile.name.split('.').pop();
-      const path = `groups/${id}/${user.id}_${Date.now()}.${ext}`;
-      const { data: up } = await supabase.storage.from('uploads').upload(path, postFile);
-      if (up) { const { data } = supabase.storage.from('uploads').getPublicUrl(path); mediaUrl = data?.publicUrl || null; }
+      try {
+        const prepared = await prepareMediaForUpload(postFile, { maxWidth: 1600, maxHeight: 1600, quality: 0.8 });
+        const ext = prepared.name.split('.').pop();
+        const path = `groups/${id}/${user.id}_${Date.now()}.${ext}`;
+        const { data: up } = await supabase.storage.from('uploads').upload(path, prepared);
+        if (up) { const { data } = supabase.storage.from('uploads').getPublicUrl(path); mediaUrl = data?.publicUrl || null; }
+      } catch (err: any) {
+        showToast(err?.message || 'Erro no upload', 'error');
+        setPosting(false);
+        return;
+      }
     }
     const { error } = await supabase.from('group_posts').insert({
       group_id: id, user_id: user.id, content: postContent.trim(), media_type: mediaType, media_url: mediaUrl,
