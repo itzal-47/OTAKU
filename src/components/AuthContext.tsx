@@ -58,18 +58,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Evita pedidos duplicados simultâneos
   const fetchingRef = useRef(false);
 
-  const loadUserData = async (userId: string) => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
-    try {
-      const prof = await fetchProfileById(userId);
-      setProfile(prof);
-      const char = await fetchCharacterByUserId(userId);
-      setCharacter(char);
-    } finally {
-      fetchingRef.current = false;
-    }
-  };
+  const activeRequestRef = useRef(0);
+
+const loadUserData = async (
+userId:string
+)=>{
+
+const requestId=
+++activeRequestRef.current;
+
+try{
+
+const [
+
+prof,
+char
+
+]=await Promise.all([
+
+fetchProfileById(userId),
+
+fetchCharacterByUserId(userId)
+
+]);
+
+if(
+requestId
+!==activeRequestRef.current
+){
+
+return;
+
+}
+
+setProfile(
+prof ?? null
+);
+
+setCharacter(
+char ?? null
+);
+
+}
+catch(err){
+
+console.error(
+"Erro carregar perfil",
+err
+);
+
+setProfile(null);
+
+setCharacter(null);
+
+}
+
+};
 
   const refreshProfile = async () => {
     if (!user) return;
@@ -91,9 +135,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sessionStorage.setItem('otakukamba-just-logged-in', 'true');
         }
 
-        if (session?.user) {
-          await loadUserData(session.user.id);
-        } else {
+        f(session?.user){
+
+queueMicrotask(
+()=>loadUserData(
+session.user.id
+)
+);
+
+} else {
           setProfile(null);
           setCharacter(null);
         }
@@ -151,13 +201,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ─── signOut ──────────────────────────────────────────────────────────────
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setCharacter(null);
-    setSession(null);
-  };
+ const signOut = async()=>{
+
+try{
+
+await supabase.auth.signOut();
+
+}
+finally{
+
+activeRequestRef.current++;
+
+setUser(null);
+
+setProfile(null);
+
+setCharacter(null);
+
+setSession(null);
+
+}
+
+};
 
   return (
     <AuthContext.Provider
