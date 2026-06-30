@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -9,6 +8,7 @@ import {
   ChevronRight, Crown, Target, Swords, Check, AlertCircle
 } from 'lucide-react';
 import type { Tournament, TournamentParticipant, TournamentMatch } from '../types/index';
+import { handleError } from '../lib/errorHandler';
 
 const STATUS_COLORS = {
   upcoming: 'bg-blue/20 text-blue',
@@ -37,6 +37,7 @@ export default function TournamentsPage() {
   const [loading, setLoading] = useState(true);
   const [ registering, setRegistering] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'bracket' | 'participants'>('overview');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Create form
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -69,21 +70,26 @@ export default function TournamentsPage() {
         .select('*')
         .order('start_date', { ascending: true });
 
-      // Get participant counts
-      if (data) {
-        const withCounts = await Promise.all(
-          data.map(async t => {
-            const { count } = await supabase
-              .from('tournament_participants')
-              .select('*', { count: 'exact', head: true })
-              .eq('tournament_id', t.id);
-            return { ...t, participants_count: count || 0 };
-          })
-        );
-        setTournaments(withCounts);
+      if (data && data.length > 0) {
+        // Uma única query para contar participantes de todos os torneios
+        // em vez de N queries separadas (N+1 query problem)
+        const ids = data.map(t => t.id);
+        const { data: counts } = await supabase
+          .from('tournament_participants')
+          .select('tournament_id')
+          .in('tournament_id', ids);
+
+        const countMap = (counts || []).reduce<Record<string, number>>((acc, row) => {
+          acc[row.tournament_id] = (acc[row.tournament_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        setTournaments(data.map(t => ({ ...t, participants_count: countMap[t.id] || 0 })));
+      } else {
+        setTournaments([]);
       }
     } catch (error) {
-      console.error('Error loading tournaments:', error);
+      handleError(error, showToast, { context: 'carregar torneios' });
     } finally {
       setLoading(false);
     }
@@ -118,7 +124,7 @@ export default function TournamentsPage() {
 
       setMatches(matchesData || []);
     } catch (error) {
-      console.error('Error loading tournament details:', error);
+      handleError(error, showToast, { context: 'carregar detalhes do torneio', silent: true });
     }
   }
 
@@ -148,19 +154,10 @@ export default function TournamentsPage() {
 
       showToast('Torneio criado!', 'success');
       setShowCreateModal(false);
-      setCreateForm({
-        name: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        registration_deadline: '',
-        max_participants: 32,
-        min_level: 1,
-        prize_pool: '',
-      });
+      setCreateForm({ name: '', description: '', start_date: '', end_date: '', registration_deadline: '', max_participants: 32, min_level: 1, prize_pool: '' });
       loadTournaments();
-    } catch {
-      showToast('Erro ao criar torneio', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'criar torneio' });
     } finally {
       setRegistering(false);
     }
@@ -185,12 +182,8 @@ export default function TournamentsPage() {
       showToast('Inscrito no torneio!', 'success');
       loadTournaments();
       if (selectedTournament) loadTournamentDetails(selectedTournament.id);
-    } catch (error: any) {
-      if (error.code === '23505') {
-        showToast('Já estás inscrito', 'error');
-      } else {
-        showToast('Erro ao inscrever', 'error');
-      }
+    } catch (err: any) {
+      handleError(err, showToast, { context: 'inscrever no torneio', codeMessages: { '23505': 'Já estás inscrito neste torneio.' } });
     } finally {
       setRegistering(false);
     }
@@ -496,11 +489,12 @@ export default function TournamentsPage() {
         </div>
 
         {/* Categories */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {['all', 'upcoming', 'registration', 'active', 'completed'].map(filter => (
             <button
               key={filter}
-              className="btn btn-ghost text-sm py-2"
+              onClick={() => setStatusFilter(filter)}
+              className={`btn text-sm py-2 flex-shrink-0 ${statusFilter === filter ? 'btn-primary' : 'btn-ghost'}`}
             >
               {filter === 'all' ? 'Todos' : STATUS_LABELS[filter as keyof typeof STATUS_LABELS]}
             </button>
@@ -508,7 +502,7 @@ export default function TournamentsPage() {
         </div>
 
         {/* Tournaments */}
-        {tournaments.length === 0 ? (
+        {tournaments.filter(t => statusFilter === 'all' || t.status === statusFilter).length === 0 ? (
           <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
             <Trophy className="mx-auto text-text3 mb-4" size={48} />
             <h3 className="font-rajdhani font-bold text-xl text-text mb-2">Sem torneios</h3>
@@ -516,7 +510,7 @@ export default function TournamentsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {tournaments.map(tournament => {
+            {tournaments.filter(t => statusFilter === 'all' || t.status === statusFilter).map(tournament => {
               const spotsLeft = tournament.max_participants - (tournament.participants_count || 0);
               const userRegistered = participants.some(p => p.user_id === user?.id);
 
