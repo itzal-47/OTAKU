@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { Menu, X, Search, Zap, MessageSquare, Inbox, Quote, Image, Music, Eye, BookOpen, Trophy, Crown, Heart } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import NotificationBell from './NotificationBell';
+import NotificationCenter from './NotificationCenter';
 
 export default function Navbar() {
   const { user, profile, signOut } = useAuth();
@@ -174,7 +174,7 @@ export default function Navbar() {
             <Link to="/messages" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors text-text2 hover:text-text" title="Mensagens">
               <MessageSquare size={18} />
             </Link>
-            <NotificationBell />
+            <NotificationCenter />
             {(profile?.is_super_admin || profile?.role === 'supreme_admin') && (
               <Link to="/inbox" className="w-8 h-8 rounded-lg hover:bg-bg3 flex items-center justify-center transition-colors text-amber" title="Inbox Admin">
                 <Inbox size={18} />
