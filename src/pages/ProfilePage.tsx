@@ -5,6 +5,8 @@ import { useAuth } from '../components/AuthContext';
 import { CLASS_INFO, type CharacterClass, type UserBadge, type Badge, type UserProfile } from '../types/index';
 import { Trophy, Swords, TrendingUp, Medal, Crown, Shield, MessageSquare, Star, Copy, Check, Award, MapPin, User, Sparkles } from 'lucide-react';
 import FollowButton from '../components/FollowButton';
+import { SkeletonBlock, SkeletonCircle } from '../components/Skeleton';
+import { handleError } from '../lib/errorHandler';
 
 export default function ProfilePage() {
   const { username } = useParams();
@@ -65,15 +67,13 @@ export default function ProfilePage() {
       setCharacter(charData);
 
       if (charData) {
-        const { data: allChars } = await supabase
+        // Conta quantos personagens têm MAIS vitórias → posição = esse número + 1
+        // Antes carregava TODOS os personagens para fazer findIndex — muito pesado
+        const { count } = await supabase
           .from('characters')
-          .select('id, wins')
-          .order('wins', { ascending: false });
-
-        if (allChars) {
-          const pos = allChars.findIndex(c => c.id === charData.id) + 1;
-          setRank(pos);
-        }
+          .select('id', { count: 'exact', head: true })
+          .gt('wins', charData.wins);
+        setRank((count || 0) + 1);
       }
 
       // Load followers count
@@ -111,7 +111,7 @@ export default function ProfilePage() {
       }
 
     } catch (error) {
-      console.error('Error loading profile:', error);
+      handleError(error, () => {}, { context: 'carregar perfil', silent: true });
     } finally {
       setLoading(false);
     }
@@ -119,8 +119,36 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pt-16">
-        <div className="w-14 h-14 rounded-full border-2 border-border2 border-t-purple animate-spin" />
+      <div className="min-h-screen pt-20 pb-12 px-4">
+        <div className="max-w-4xl mx-auto space-y-5">
+          {/* Header skeleton */}
+          <div className="bg-bg2 border border-border rounded-2xl overflow-hidden animate-pulse">
+            <div className="h-36 bg-bg3" />
+            <div className="px-6 pb-6 -mt-10">
+              <div className="flex items-end gap-4 mb-4">
+                <div className="w-20 h-20 rounded-2xl bg-bg3 flex-shrink-0" />
+                <div className="flex-1 pb-2 space-y-2">
+                  <SkeletonBlock className="h-6 w-40" />
+                  <SkeletonBlock className="h-3.5 w-24" />
+                </div>
+              </div>
+              <div className="flex gap-6 pt-4 border-t border-border">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <SkeletonBlock className="h-5 w-10" />
+                    <SkeletonBlock className="h-2.5 w-16" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-bg2 border border-border rounded-2xl animate-pulse" />)}
+          </div>
+          {/* Attributes skeleton */}
+          <div className="h-40 bg-bg2 border border-border rounded-2xl animate-pulse" />
+        </div>
       </div>
     );
   }
