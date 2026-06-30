@@ -59,6 +59,11 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Fundo de malha futurista subtil */
+  background-image: radial-gradient(circle at 50% 0%, rgba(123, 92, 240, 0.1) 0%, transparent 50%),
+                    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px, 30px 30px;
 }
 
 .font-bebas {
@@ -109,6 +114,7 @@ body {
   }
 }
 
+/* Base Components (Legacy) */
 .card {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -205,6 +211,97 @@ body {
   scrollbar-width: none;
 }
 
+/* ====================================================
+   🔥 NOVOS COMPONENTES: GAME DESIGN AAA
+   ==================================================== */
+@layer components {
+  /* 🪟 1. Glassmorphic Futurista */
+  .glass-card {
+    @apply relative overflow-hidden backdrop-blur-2xl rounded-2xl;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(18, 18, 26, 0.45);
+    border: 1px solid rgba(123, 92, 240, 0.3);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 -1px 1px rgba(255, 255, 255, 0.05);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+
+  .glass-card:hover {
+    border-color: rgba(123, 92, 240, 0.5);
+    box-shadow: 0 0 15px rgba(123, 92, 240, 0.4), 0 0 30px rgba(123, 92, 240, 0.2);
+    transform: translateY(-4px) scale(1.01);
+  }
+
+  /* Linha de energia que corre pelo topo do cartão no hover */
+  .glass-card::before {
+    content: '';
+    @apply absolute top-0 left-0 w-full h-[2px] opacity-0 transition-opacity duration-300;
+    background: linear-gradient(90deg, transparent, var(--purple), transparent);
+    background-size: 200% auto;
+  }
+
+  .glass-card:hover::before {
+    @apply opacity-100;
+    animation: energy-flow-x 2.5s linear infinite;
+  }
+
+  /* 🔪 2. Botões de Jogo AAA (Layout Orgânico) */
+  .btn-cyber {
+    @apply relative inline-flex items-center justify-center font-bold tracking-widest text-white overflow-hidden transition-all duration-300 z-10;
+    clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+    background: var(--bg3);
+    padding: 0.75rem 2rem;
+  }
+
+  .btn-cyber::before {
+    content: '';
+    @apply absolute inset-0 -z-10 opacity-0 transition-opacity duration-300;
+    background: rgba(123, 92, 240, 0.2);
+  }
+
+  .btn-cyber::after {
+    content: '';
+    @apply absolute left-0 bottom-0 w-full h-1 transition-all duration-300 transform translate-y-full;
+    background: var(--purple);
+    box-shadow: 0 0 15px var(--purple);
+  }
+
+  .btn-cyber:hover {
+    color: white;
+    transform: scale(1.05);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+
+  .btn-cyber:hover::before {
+    @apply opacity-100;
+  }
+
+  .btn-cyber:hover::after {
+    @apply translate-y-0;
+  }
+
+  /* ✨ 3. Efeitos de Aura para Avatares ou Badges */
+  .aura-container {
+    @apply relative z-0;
+  }
+
+  .aura-container::after {
+    content: '';
+    @apply absolute -inset-2 rounded-full opacity-0 -z-10 transition-all duration-500;
+    background: linear-gradient(90deg, var(--purple), var(--teal), var(--purple));
+    background-size: 200% auto;
+  }
+
+  .aura-container:hover::after {
+    @apply opacity-40;
+    animation: aura-glow-pulse 4s cubic-bezier(0.25, 1, 0.5, 1) infinite, energy-flow-x 2.5s linear infinite;
+  }
+  
+  /* Textos Néon */
+  .text-neon {
+    color: #fff;
+    text-shadow: 0 0 5px var(--purple), 0 0 15px var(--purple);
+  }
+}
+
 /* Animations */
 .animate-delay-100 {
   animation-delay: 100ms;
@@ -220,6 +317,17 @@ body {
 
 .animate-delay-400 {
   animation-delay: 400ms;
+}
+
+/* Novas Keyframes AAA */
+@keyframes energy-flow-x {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes aura-glow-pulse {
+  0%, 100% { transform: scale(1); filter: blur(10px); }
+  50% { transform: scale(1.08); filter: blur(15px); }
 }
 
 @keyframes float {
