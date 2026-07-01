@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { Send, Hash, Users, Plus, X, Crown, Shield, MessageCircle, Smile, Lock, UserPlus } from 'lucide-react';
 import type { ChatRoom, ChatMessage, ChatRoomMember } from '../types/index';
 import { EMOJI_LIST } from '../types/index';
+import { handleError } from '../lib/errorHandler';
 
 const USER_COLORS = ['purple2', 'red2', 'teal', 'amber', 'purple'];
 
@@ -119,21 +120,27 @@ export default function ChatPage() {
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (roomsData) {
-        const roomsWithCounts = await Promise.all(roomsData.map(async (room) => {
-          const { count } = await supabase
-            .from('chat_room_members')
-            .select('*', { count: 'exact', head: true })
-            .eq('room_id', room.id);
-          return { ...room, member_count: count || 0 };
-        }));
+      if (roomsData && roomsData.length > 0) {
+        // Uma única query para todos os member_counts em vez de N queries (N+1 fix)
+        const roomIds = roomsData.map(r => r.id);
+        const { data: memberRows } = await supabase
+          .from('chat_room_members')
+          .select('room_id')
+          .in('room_id', roomIds);
+
+        const countMap = (memberRows || []).reduce<Record<string, number>>((acc, row) => {
+          acc[row.room_id] = (acc[row.room_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        const roomsWithCounts = roomsData.map(room => ({ ...room, member_count: countMap[room.id] || 0 }));
         setRooms(roomsWithCounts);
         if (roomsWithCounts.length > 0 && !selectedRoom) {
           setSelectedRoom(roomsWithCounts[0]);
         }
       }
     } catch (error) {
-      console.error('Error loading rooms:', error);
+      handleError(error, showToast, { context: 'carregar salas de chat' });
     } finally {
       setLoading(false);
     }
@@ -215,23 +222,19 @@ export default function ChatPage() {
       if (error) throw error;
       setJoinRequests(prev => [...prev, roomId]);
       showToast('Pedido enviado! Aguarda aprovação.', 'success');
-    } catch {
-      showToast('Erro ao enviar pedido', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'enviar pedido de entrada' });
     }
   }
 
   async function handleApproveJoin(requestId: string, requesterId: string, roomId: string) {
     try {
-      await supabase.from('chat_room_members').insert({
-        room_id: roomId,
-        user_id: requesterId,
-        role: 'member'
-      });
+      await supabase.from('chat_room_members').insert({ room_id: roomId, user_id: requesterId, role: 'member' });
       await supabase.from('chat_room_join_requests').update({ status: 'approved' }).eq('id', requestId);
       showToast('Membro aceite!', 'success');
       loadRoomMembers();
-    } catch {
-      showToast('Erro ao aceitar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'aceitar membro' });
     }
   }
 
@@ -323,11 +326,11 @@ export default function ChatPage() {
           prev.map(m => m.id === tempId ? { ...m, id: inserted.id } : m)
         );
       }
-    } catch {
+    } catch (err) {
       // Remover mensagem optimista se falhar
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setNewMessage(content);
-      showToast('Erro ao enviar mensagem', 'error');
+      handleError(err, showToast, { context: 'enviar mensagem' });
     } finally {
       setSending(false);
     }
@@ -706,8 +709,8 @@ function CreateRoomRequestModal({
         onSuccess(null);
       }
       onClose();
-    } catch {
-      showToast('Erro', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'criar sala de chat' });
     } finally {
       setLoading(false);
     }
