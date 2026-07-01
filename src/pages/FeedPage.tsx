@@ -202,16 +202,44 @@ const PostCard = memo(function PostCard({
     const ch = supabase.channel(`post_comments_${post.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${post.id}` },
         async (payload) => {
+          // Ignora comentário próprio (já adicionado optimisticamente)
+          if (payload.new.user_id === currentUser?.id) return;
           const { data: prof } = await supabase.from('profiles').select('username, avatar_url').eq('id', payload.new.user_id).maybeSingle();
           const nc: Comment = { ...payload.new as any, profiles: prof || { username: 'Unknown' } };
           setComments(prev => prev.some(c => c.id === nc.id) ? prev : [...prev, nc]);
           setCommentsCount(prev => prev + 1);
         }
-      ).subscribe();
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'post_comments', filter: `post_id=eq.${post.id}` },
+        (payload) => {
+          setComments(prev => prev.filter(c => c.id !== payload.old.id));
+          setCommentsCount(prev => Math.max(prev - 1, 0));
+        }
+      )
+      .subscribe();
     commentChannelRef.current = ch;
 
     return () => { if (commentChannelRef.current) { supabase.removeChannel(commentChannelRef.current); commentChannelRef.current = null; } };
   }, [showComments, post.id]);
+
+  // Realtime likes — actualiza contagem quando outros utilizadores curtem
+  useEffect(() => {
+    const ch = supabase.channel(`post_likes_${post.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'post_likes', filter: `post_id=eq.${post.id}` },
+        (payload) => {
+          if (payload.new.user_id === currentUser?.id) return; // já tratado optimisticamente
+          setLikesCount(prev => prev + 1);
+        }
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'post_likes', filter: `post_id=eq.${post.id}` },
+        (payload) => {
+          if (payload.old.user_id === currentUser?.id) return;
+          setLikesCount(prev => Math.max(prev - 1, 0));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [post.id, currentUser?.id]);
 
   async function loadComments() {
     const { data } = await supabase
@@ -226,20 +254,23 @@ const PostCard = memo(function PostCard({
   async function handleLike() {
     if (!currentUser) { showToast('Entra para curtir', 'info'); return; }
     const wasLiked = liked;
+    // Update optimista imediato
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? Math.max(prev - 1, 0) : prev + 1);
     if (!wasLiked) { setLikeAnim(true); setTimeout(() => setLikeAnim(false), 500); }
     try {
       if (wasLiked) {
-        await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', currentUser.id);
-        await supabase.from('posts').update({ likes_count: Math.max(likesCount - 1, 0) }).eq('id', post.id);
+        await supabase.from('post_likes').delete()
+          .eq('post_id', post.id).eq('user_id', currentUser.id);
       } else {
         await supabase.from('post_likes').insert({ post_id: post.id, user_id: currentUser.id });
-        await supabase.from('posts').update({ likes_count: likesCount + 1 }).eq('id', post.id);
       }
+      // Trigger na DB actualiza posts.likes_count automaticamente — não precisamos de update manual
     } catch {
+      // Reverte se falhar
       setLiked(wasLiked);
       setLikesCount(prev => wasLiked ? prev + 1 : Math.max(prev - 1, 0));
+      showToast('Erro ao curtir', 'error');
     }
   }
 
@@ -261,8 +292,7 @@ const PostCard = memo(function PostCard({
         .insert({ post_id: post.id, user_id: currentUser.id, content })
         .select('id').maybeSingle();
       if (ins) setComments(prev => prev.map(c => c.id === tempId ? { ...c, id: ins.id } : c));
-      await supabase.from('posts').update({ comments_count: commentsCount + 1 }).eq('id', post.id);
-      await supabase.from('profiles').update({ total_xp: (currentProfile?.total_xp || 0) + 5 }).eq('id', currentUser.id);
+      // Trigger na DB actualiza posts.comments_count automaticamente
     } catch {
       setComments(prev => prev.filter(c => c.id !== tempId));
       setCommentsCount(prev => Math.max(prev - 1, 0));
@@ -770,14 +800,25 @@ export default function FeedPage() {
 
   useEffect(() => { loadPosts(false); }, [loadPosts]);
 
-  // Realtime — new posts notification
+  // Realtime global — novos posts, apagados, e actualização de contadores
   useEffect(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     const ch = supabase.channel('feed_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
-        if (user && (payload.new as any).user_id === user.id) return; // already added optimistically
+        if (user && (payload.new as any).user_id === user.id) return; // já adicionado optimisticamente
         setPendingCount(prev => prev + 1);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, payload => {
+        setPosts(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, payload => {
+        // Actualiza contadores em posts que já estão no feed (ex: likes/comments de outros)
+        setPosts(prev => prev.map(p =>
+          p.id === payload.new.id
+            ? { ...p, likes_count: payload.new.likes_count, comments_count: payload.new.comments_count }
+            : p
+        ));
       })
       .subscribe();
 
