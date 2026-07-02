@@ -21,7 +21,7 @@ interface OSTTrack {
 
 interface Playlist { id: string; name: string; trackIds: string[]; createdAt: string; }
 
-const ANIME_EMOJIS = ['ð','âï¸','ð¥','â¨','ð','ð¸'];
+const ANIME_EMOJIS = ['🎌','⚔️','🔥','✨','💜','🌸'];
 const SORT_OPTIONS = [
   { id: 'recent', label: 'Mais Recentes', icon: Clock },
   { id: 'popular', label: 'Mais Curtidas', icon: Heart },
@@ -35,11 +35,11 @@ function savePlaylists(pl: Playlist[]) { localStorage.setItem('otaku_playlists',
 
 function ShareMenu({ track, onClose }: { track: OSTTrack; onClose: () => void }) {
   const url = `${window.location.origin}/osts`;
-  const text = `ðµ ${track.title} â ${track.artist}${track.anime ? ` (${track.anime})` : ''} | OtakuKamba`;
+  const text = `🎵 ${track.title} — ${track.artist}${track.anime ? ` (${track.anime})` : ''} | OtakuKamba`;
   const options = [
-    { label: 'WhatsApp', emoji: 'ð¬', href: `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}` },
-    { label: 'Facebook', emoji: 'ð¥', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}` },
-    { label: 'Twitter/X', emoji: 'ð¦', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}` },
+    { label: 'WhatsApp', emoji: '💬', href: `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}` },
+    { label: 'Facebook', emoji: '👥', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}` },
+    { label: 'Twitter/X', emoji: '🐦', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}` },
   ];
   return (
     <div className="absolute right-0 top-8 bg-bg3 border border-border rounded-xl shadow-2xl z-30 w-44 py-1 overflow-hidden">
@@ -51,7 +51,7 @@ function ShareMenu({ track, onClose }: { track: OSTTrack; onClose: () => void })
       ))}
       <button onClick={async () => { await navigator.clipboard.writeText(url); onClose(); }}
         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4 transition-colors">
-        <span>ð</span> Copiar link
+        <span>🔗</span> Copiar link
       </button>
     </div>
   );
@@ -93,7 +93,7 @@ function TrackCard({ track, currentTrackId, isPlaying, onToggle, onLike, onEdit,
               className="text-red flex-shrink-0"><Youtube size={12} /></a>
           )}
         </div>
-        <p className="text-xs text-text3 truncate">{track.artist}{track.anime ? ` Â· ${track.anime}` : ''}</p>
+        <p className="text-xs text-text3 truncate">{track.artist}{track.anime ? ` · ${track.anime}` : ''}</p>
       </div>
 
       {/* Actions */}
@@ -108,7 +108,7 @@ function TrackCard({ track, currentTrackId, isPlaying, onToggle, onLike, onEdit,
           </button>
           {showMenu && !showShare && (
             <div className="absolute right-0 top-8 bg-bg3 border border-border rounded-xl shadow-2xl z-30 w-48 py-1 overflow-hidden">
-              <button onClick={() => { onAddToPlaylist(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><ListMusic size={13} className="text-purple2" /> Adicionar Ã  playlist</button>
+              <button onClick={() => { onAddToPlaylist(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><ListMusic size={13} className="text-purple2" /> Adicionar à playlist</button>
               <button onClick={() => setShowShare(true)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><Share2 size={13} className="text-teal" /> Partilhar</button>
               {(isOwn || isAdmin) && <div className="border-t border-border my-1" />}
               {(isOwn || isAdmin) && <button onClick={() => { onEdit(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><Edit3 size={13} className="text-amber" /> Editar</button>}
@@ -165,7 +165,7 @@ export default function OSTPage() {
       }
       setTracks((data || []).map(t => ({ ...t, liked_by_me: likedIds.has(t.id) })) as OSTTrack[]);
     } catch (err) {
-      handleError(err, showToast, { context: 'carregar mÃºsicas' });
+      handleError(err, showToast, { context: 'carregar músicas' });
     } finally {
       setLoading(false);
     }
@@ -199,9 +199,9 @@ export default function OSTPage() {
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
       setForm(f => ({ ...f, audio_url: publicUrl }));
-      showToast('Ficheiro carregado! â', 'success');
+      showToast('Ficheiro carregado! ✓', 'success');
     } catch (err) {
-      handleError(err, showToast, { context: 'carregar ficheiro de Ã¡udio' });
+      handleError(err, showToast, { context: 'carregar ficheiro de áudio' });
     } finally {
       setUploadingFile(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -210,8 +210,8 @@ export default function OSTPage() {
 
   async function handleAdd() {
     if (!user) return;
-    if (!form.title.trim() || !form.artist.trim()) { showToast('TÃ­tulo e artista sÃ£o obrigatÃ³rios', 'error'); return; }
-    if (!form.youtube_url.trim() && !form.audio_url.trim()) { showToast('Adiciona um URL do YouTube ou um ficheiro de Ã¡udio', 'error'); return; }
+    if (!form.title.trim() || !form.artist.trim()) { showToast('Título e artista são obrigatórios', 'error'); return; }
+    if (!form.youtube_url.trim() && !form.audio_url.trim()) { showToast('Adiciona um URL do YouTube ou um ficheiro de áudio', 'error'); return; }
     setAdding(true);
     try {
       const { error } = await supabase.from('ost_tracks').insert({
@@ -222,12 +222,12 @@ export default function OSTPage() {
         added_by: user.id,
       });
       if (error) throw error;
-      showToast('MÃºsica adicionada! ðµ', 'success');
+      showToast('Música adicionada! 🎵', 'success');
       setForm({ title: '', artist: '', anime: '', youtube_url: '', audio_url: '' });
       setShowAdd(false);
       loadTracks();
     } catch (err) {
-      handleError(err, showToast, { context: 'adicionar mÃºsica' });
+      handleError(err, showToast, { context: 'adicionar música' });
     } finally {
       setAdding(false);
     }
@@ -241,23 +241,23 @@ export default function OSTPage() {
         anime: form.anime.trim() || null, youtube_url: form.youtube_url.trim() || null,
       }).eq('id', editTrack.id);
       if (error) throw error;
-      showToast('MÃºsica actualizada! â', 'success');
+      showToast('Música actualizada! ✓', 'success');
       setEditTrack(null);
       loadTracks();
     } catch (err) {
-      handleError(err, showToast, { context: 'editar mÃºsica' });
+      handleError(err, showToast, { context: 'editar música' });
     }
   }
 
   async function handleDelete(trackId: string) {
-    if (!confirm('Eliminar esta mÃºsica?')) return;
+    if (!confirm('Eliminar esta música?')) return;
     try {
       const { error } = await supabase.from('ost_tracks').delete().eq('id', trackId);
       if (error) throw error;
       setTracks(prev => prev.filter(t => t.id !== trackId));
-      showToast('MÃºsica eliminada', 'info');
+      showToast('Música eliminada', 'info');
     } catch (err) {
-      handleError(err, showToast, { context: 'eliminar mÃºsica' });
+      handleError(err, showToast, { context: 'eliminar música' });
     }
   }
 
@@ -278,14 +278,14 @@ export default function OSTPage() {
     const pl: Playlist = { id: Date.now().toString(), name: newPlaylistName.trim(), trackIds: [], createdAt: new Date().toISOString() };
     const updated = [...playlists, pl];
     setPlaylists(updated); savePlaylists(updated); setNewPlaylistName('');
-    showToast('Playlist criada! ð¶', 'success');
+    showToast('Playlist criada! 🎶', 'success');
   }
 
   function addTrackToPlaylist(playlist: Playlist, trackId: string) {
-    if (playlist.trackIds.includes(trackId)) { showToast('JÃ¡ estÃ¡ na playlist', 'info'); return; }
+    if (playlist.trackIds.includes(trackId)) { showToast('Já está na playlist', 'info'); return; }
     const updated = playlists.map(p => p.id === playlist.id ? { ...p, trackIds: [...p.trackIds, trackId] } : p);
     setPlaylists(updated); savePlaylists(updated);
-    showToast(`Adicionado a "${playlist.name}" â`, 'success');
+    showToast(`Adicionado a "${playlist.name}" ✓`, 'success');
     setAddToPlaylistTrack(null);
   }
 
@@ -312,8 +312,8 @@ export default function OSTPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="font-bebas text-4xl text-text tracking-wide">MÃºsicas <span className="text-purple2">&amp; OSTs</span></h1>
-            <p className="text-text3 text-xs mt-0.5">{tracks.length} faixas Â· toca sem sair da plataforma</p>
+            <h1 className="font-bebas text-4xl text-text tracking-wide">Músicas <span className="text-purple2">&amp; OSTs</span></h1>
+            <p className="text-text3 text-xs mt-0.5">{tracks.length} faixas · toca sem sair da plataforma</p>
           </div>
           {user && (
             <button onClick={() => { setShowAdd(true); setForm({ title: '', artist: '', anime: '', youtube_url: '', audio_url: '' }); }} className="btn btn-primary text-sm gap-2">
@@ -325,7 +325,7 @@ export default function OSTPage() {
         {/* Tabs */}
         <div className="flex gap-1 bg-bg2 border border-border rounded-xl p-1 mb-5">
           <button onClick={() => setActiveTab('all')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'all' ? 'bg-purple text-white' : 'text-text3 hover:text-text'}`}>
-            Todas as MÃºsicas
+            Todas as Músicas
           </button>
           <button onClick={() => setActiveTab('playlists')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'playlists' ? 'bg-purple text-white' : 'text-text3 hover:text-text'}`}>
             <span className="flex items-center justify-center gap-1.5"><ListMusic size={14} /> Playlists {playlists.length > 0 && <span className="text-[10px] bg-white/20 px-1 rounded">{playlists.length}</span>}</span>
@@ -338,7 +338,7 @@ export default function OSTPage() {
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text3" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por tÃ­tulo, artista ou anime..." className="input w-full pl-9 text-sm" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por título, artista ou anime..." className="input w-full pl-9 text-sm" />
               </div>
               <select value={sort} onChange={e => setSort(e.target.value)} className="bg-bg2 border border-border rounded-xl px-3 text-sm text-text2 flex-shrink-0">
                 {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -358,8 +358,8 @@ export default function OSTPage() {
             ) : displayTracks.length === 0 ? (
               <div className="text-center py-14 bg-bg2 border border-border rounded-2xl">
                 <Music size={40} className="mx-auto mb-3 text-text3" />
-                <h3 className="font-rajdhani font-bold text-lg text-text mb-1">Sem mÃºsicas</h3>
-                <p className="text-text3 text-sm">{search ? 'Tenta outra pesquisa.' : 'SÃª o primeiro a adicionar uma OST!'}</p>
+                <h3 className="font-rajdhani font-bold text-lg text-text mb-1">Sem músicas</h3>
+                <p className="text-text3 text-sm">{search ? 'Tenta outra pesquisa.' : 'Sê o primeiro a adicionar uma OST!'}</p>
               </div>
             ) : (
               <div className="bg-bg2 border border-border rounded-2xl p-2 space-y-0.5">
@@ -401,7 +401,7 @@ export default function OSTPage() {
                       <div key={pl.id} className="flex items-center gap-3 bg-bg2 border border-border rounded-xl p-3 hover:border-border2 transition-colors">
                         <button onClick={() => setSelectedPlaylist(pl)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple/30 to-teal/30 flex items-center justify-center flex-shrink-0"><ListMusic size={16} className="text-purple2" /></div>
-                          <div className="min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} mÃºsicas</div></div>
+                          <div className="min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} músicas</div></div>
                         </button>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           {pl.trackIds.length > 0 && (
@@ -419,13 +419,13 @@ export default function OSTPage() {
               </>
             ) : (
               <>
-                <button onClick={() => setSelectedPlaylist(null)} className="flex items-center gap-1.5 text-sm text-text3 hover:text-text mb-4">â Voltar</button>
+                <button onClick={() => setSelectedPlaylist(null)} className="flex items-center gap-1.5 text-sm text-text3 hover:text-text mb-4">← Voltar</button>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-rajdhani font-bold text-xl text-text">{selectedPlaylist.name}</h2>
                   {playlistTracks.length > 0 && <button onClick={() => play(playlistTracks[0], playlistTracks)} className="btn btn-primary text-xs py-2 px-3"><Play size={13} /> Tocar tudo</button>}
                 </div>
                 {playlistTracks.length === 0 ? (
-                  <div className="text-center py-10 bg-bg2 border border-border rounded-2xl text-text3 text-sm">Playlist vazia. Adiciona mÃºsicas usando o menu â® de cada faixa.</div>
+                  <div className="text-center py-10 bg-bg2 border border-border rounded-2xl text-text3 text-sm">Playlist vazia. Adiciona músicas usando o menu ⋮ de cada faixa.</div>
                 ) : (
                   <div className="bg-bg2 border border-border rounded-2xl p-2 space-y-0.5">
                     {playlistTracks.map(track => (
@@ -456,18 +456,18 @@ export default function OSTPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setShowAdd(false)}>
           <div className="bg-bg2 border border-border rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-rajdhani font-bold text-lg text-text">Adicionar MÃºsica</h2>
+              <h2 className="font-rajdhani font-bold text-lg text-text">Adicionar Música</h2>
               <button onClick={() => setShowAdd(false)}><X size={18} className="text-text3" /></button>
             </div>
             <div className="space-y-3">
               <div className="flex gap-2">
                 {(['url', 'file'] as const).map(m => (
                   <button key={m} onClick={() => setAddMode(m)} className={`flex-1 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${addMode === m ? 'bg-purple/20 text-purple2 border border-purple/30' : 'bg-bg3 text-text3 border border-transparent'}`}>
-                    {m === 'url' ? <><Youtube size={14} /> URL YouTube</> : <><Upload size={14} /> Ficheiro de Ãudio</>}
+                    {m === 'url' ? <><Youtube size={14} /> URL YouTube</> : <><Upload size={14} /> Ficheiro de Áudio</>}
                   </button>
                 ))}
               </div>
-              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="TÃ­tulo *" className="input w-full text-sm" />
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Título *" className="input w-full text-sm" />
               <input value={form.artist} onChange={e => setForm(f => ({ ...f, artist: e.target.value }))} placeholder="Artista *" className="input w-full text-sm" />
               <input value={form.anime} onChange={e => setForm(f => ({ ...f, anime: e.target.value }))} placeholder="Anime (opcional)" className="input w-full text-sm" />
               {addMode === 'url' ? (
@@ -476,14 +476,14 @@ export default function OSTPage() {
                 <div>
                   <input ref={fileRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
                   <button onClick={() => fileRef.current?.click()} disabled={uploadingFile} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-border hover:border-purple/50 text-sm text-text3 transition-colors disabled:opacity-50">
-                    {uploadingFile ? <><Loader2 size={15} className="animate-spin" /> A carregar...</> : form.audio_url ? 'â Ficheiro carregado' : <><Upload size={15} /> Seleccionar ficheiro de Ã¡udio</>}
+                    {uploadingFile ? <><Loader2 size={15} className="animate-spin" /> A carregar...</> : form.audio_url ? '✓ Ficheiro carregado' : <><Upload size={15} /> Seleccionar ficheiro de áudio</>}
                   </button>
                 </div>
               )}
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setShowAdd(false)} className="btn btn-ghost flex-1 text-sm">Cancelar</button>
                 <button onClick={handleAdd} disabled={adding} className="btn btn-primary flex-1 text-sm disabled:opacity-50">
-                  {adding ? 'Adicionando...' : 'ðµ Adicionar'}
+                  {adding ? 'Adicionando...' : '🎵 Adicionar'}
                 </button>
               </div>
             </div>
@@ -496,11 +496,11 @@ export default function OSTPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setEditTrack(null)}>
           <div className="bg-bg2 border border-border rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-rajdhani font-bold text-lg text-text">Editar MÃºsica</h2>
+              <h2 className="font-rajdhani font-bold text-lg text-text">Editar Música</h2>
               <button onClick={() => setEditTrack(null)}><X size={18} className="text-text3" /></button>
             </div>
             <div className="space-y-3">
-              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="TÃ­tulo" className="input w-full text-sm" />
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Título" className="input w-full text-sm" />
               <input value={form.artist} onChange={e => setForm(f => ({ ...f, artist: e.target.value }))} placeholder="Artista" className="input w-full text-sm" />
               <input value={form.anime} onChange={e => setForm(f => ({ ...f, anime: e.target.value }))} placeholder="Anime" className="input w-full text-sm" />
               <input value={form.youtube_url} onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))} placeholder="URL YouTube" className="input w-full text-sm" />
@@ -518,7 +518,7 @@ export default function OSTPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setAddToPlaylistTrack(null)}>
           <div className="bg-bg2 border border-border rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-rajdhani font-bold text-base text-text">Adicionar Ã  Playlist</h2>
+              <h2 className="font-rajdhani font-bold text-base text-text">Adicionar à Playlist</h2>
               <button onClick={() => setAddToPlaylistTrack(null)}><X size={16} className="text-text3" /></button>
             </div>
             {playlists.length === 0 ? (
@@ -528,8 +528,8 @@ export default function OSTPage() {
                 {playlists.map(pl => (
                   <button key={pl.id} onClick={() => addTrackToPlaylist(pl, addToPlaylistTrack.id)} className="w-full flex items-center gap-3 bg-bg3 rounded-xl p-3 hover:bg-bg4 transition-colors text-left">
                     <ListMusic size={15} className="text-purple2 flex-shrink-0" />
-                    <div className="flex-1 min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} mÃºsicas</div></div>
-                    {pl.trackIds.includes(addToPlaylistTrack.id) && <span className="text-xs text-teal">â</span>}
+                    <div className="flex-1 min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} músicas</div></div>
+                    {pl.trackIds.includes(addToPlaylistTrack.id) && <span className="text-xs text-teal">✓</span>}
                   </button>
                 ))}
               </div>
