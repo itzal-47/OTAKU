@@ -1,379 +1,542 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/ToastContext';
-import { Music, Play, Pause, ExternalLink, Plus, Heart, Trash2, X, Volume2, VolumeX } from 'lucide-react';
+import { usePlayer } from '../contexts/PlayerContext';
+import { prepareMediaForUpload } from '../lib/imageCompress';
+import { handleError } from '../lib/errorHandler';
+import {
+  Music, Play, Pause, Plus, X, Heart, Search, MoreVertical,
+  Youtube, Upload, Edit3, Trash2, Share2, ListMusic,
+  TrendingUp, Clock, ChevronRight, Loader2,
+} from 'lucide-react';
 
-interface MusicTrack {
-  id: string;
-  title: string;
-  artist: string;
-  anime: string;
-  youtube_url: string | null;
-  spotify_url: string | null;
-  audio_url?: string | null;
-  added_by: string;
-  likes_count: number;
-  created_at: string;
-  profiles?: { username: string } | { username: string }[];
+interface OSTTrack {
+  id: string; title: string; artist: string; anime: string | null;
+  youtube_url: string | null; audio_url: string | null; added_by: string;
+  likes_count: number; created_at: string;
+  profiles?: { username: string };
   liked_by_me?: boolean;
 }
 
-const DEFAULT_TRACKS = [
-  { title: 'Unravel', artist: 'TK from Ling tosite sigure', anime: 'Tokyo Ghoul', youtube_url: 'https://www.youtube.com/watch?v=7aMOurgDB-o' },
-  { title: 'The Hero!!', artist: 'JAM Project', anime: 'One Punch Man', youtube_url: 'https://www.youtube.com/watch?v=at77j2iNltM' },
-  { title: 'Gurenge', artist: 'LiSA', anime: 'Demon Slayer', youtube_url: 'https://www.youtube.com/watch?v=9E6b3swgLD4' },
-  { title: 'Again', artist: 'YUI', anime: 'Fullmetal Alchemist Brotherhood', youtube_url: 'https://www.youtube.com/watch?v=2J6DX4Yg_1s' },
-  { title: 'Departure!', artist: 'Masatoshi Ono', anime: 'Hunter x Hunter', youtube_url: 'https://www.youtube.com/watch?v=3wQ3WOOt3i8' },
-  { title: 'Blue Bird', artist: 'Ikimono-gakari', anime: 'Naruto Shippuden', youtube_url: 'https://www.youtube.com/watch?v=an7hXxH3B9s' },
-  { title: 'We Are!', artist: 'Hiroshi Kitadani', anime: 'One Piece', youtube_url: 'https://www.youtube.com/watch?v=7T1O4j4O9c0' },
-  { title: 'Shinzou wo Sasageyo', artist: 'Linked Horizon', anime: 'Attack on Titan', youtube_url: 'https://www.youtube.com/watch?v=4T6I1qU6DqI' },
-  { title: 'Silhouette', artist: 'KANA-BOON', anime: 'Naruto Shippuden', youtube_url: 'https://www.youtube.com/watch?v=dlFA0Zq1k2A' },
-  { title: 'The Day', artist: 'Porno Graffitti', anime: 'My Hero Academia', youtube_url: 'https://www.youtube.com/watch?v=8n3nMn9a3dU' }
+interface Playlist { id: string; name: string; trackIds: string[]; createdAt: string; }
+
+const ANIME_EMOJIS = ['ð','âï¸','ð¥','â¨','ð','ð¸'];
+const SORT_OPTIONS = [
+  { id: 'recent', label: 'Mais Recentes', icon: Clock },
+  { id: 'popular', label: 'Mais Curtidas', icon: Heart },
+  { id: 'trending', label: 'Em Alta', icon: TrendingUp },
 ];
 
+function getPlaylists(): Playlist[] {
+  try { return JSON.parse(localStorage.getItem('otaku_playlists') || '[]'); } catch { return []; }
+}
+function savePlaylists(pl: Playlist[]) { localStorage.setItem('otaku_playlists', JSON.stringify(pl)); }
+
+function ShareMenu({ track, onClose }: { track: OSTTrack; onClose: () => void }) {
+  const url = `${window.location.origin}/osts`;
+  const text = `ðµ ${track.title} â ${track.artist}${track.anime ? ` (${track.anime})` : ''} | OtakuKamba`;
+  const options = [
+    { label: 'WhatsApp', emoji: 'ð¬', href: `https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}` },
+    { label: 'Facebook', emoji: 'ð¥', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}` },
+    { label: 'Twitter/X', emoji: 'ð¦', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}` },
+  ];
+  return (
+    <div className="absolute right-0 top-8 bg-bg3 border border-border rounded-xl shadow-2xl z-30 w-44 py-1 overflow-hidden">
+      {options.map(o => (
+        <a key={o.label} href={o.href} target="_blank" rel="noopener noreferrer" onClick={onClose}
+          className="flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4 transition-colors">
+          <span>{o.emoji}</span> {o.label}
+        </a>
+      ))}
+      <button onClick={async () => { await navigator.clipboard.writeText(url); onClose(); }}
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4 transition-colors">
+        <span>ð</span> Copiar link
+      </button>
+    </div>
+  );
+}
+
+function TrackCard({ track, currentTrackId, isPlaying, onToggle, onLike, onEdit, onDelete, onAddToPlaylist, isOwn, isAdmin }:
+  { track: OSTTrack; currentTrackId?: string; isPlaying: boolean; onToggle: () => void;
+    onLike: () => void; onEdit: () => void; onDelete: () => void; onAddToPlaylist: () => void;
+    isOwn: boolean; isAdmin: boolean; }) {
+  const isActive = currentTrackId === track.id;
+  const [showMenu, setShowMenu] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMenu && !showShare) return;
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) { setShowMenu(false); setShowShare(false); } };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showMenu, showShare]);
+
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${isActive ? 'bg-purple/10 border border-purple/30' : 'hover:bg-bg3 border border-transparent'}`}>
+      {/* Play button */}
+      <button onClick={onToggle} className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+        track.audio_url ? (isActive ? 'bg-purple text-white' : 'bg-bg3 group-hover:bg-purple/20 text-text2') : 'bg-bg3 text-text3 cursor-default'
+      }`}>
+        {track.audio_url
+          ? (isActive && isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />)
+          : <Music size={16} />}
+      </button>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className={`text-sm font-semibold truncate ${isActive ? 'text-purple2' : 'text-text'}`}>{track.title}</p>
+          {track.youtube_url && (
+            <a href={track.youtube_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              className="text-red flex-shrink-0"><Youtube size={12} /></a>
+          )}
+        </div>
+        <p className="text-xs text-text3 truncate">{track.artist}{track.anime ? ` Â· ${track.anime}` : ''}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button onClick={onLike} className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition-all ${track.liked_by_me ? 'text-red bg-red/10' : 'text-text3 hover:text-red hover:bg-bg4'}`}>
+          <Heart size={12} fill={track.liked_by_me ? 'currentColor' : 'none'} /> {track.likes_count}
+        </button>
+
+        <div className="relative" ref={menuRef}>
+          <button onClick={() => setShowMenu(!showMenu)} className="w-7 h-7 rounded-lg flex items-center justify-center text-text3 hover:text-text hover:bg-bg4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <MoreVertical size={14} />
+          </button>
+          {showMenu && !showShare && (
+            <div className="absolute right-0 top-8 bg-bg3 border border-border rounded-xl shadow-2xl z-30 w-48 py-1 overflow-hidden">
+              <button onClick={() => { onAddToPlaylist(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><ListMusic size={13} className="text-purple2" /> Adicionar Ã  playlist</button>
+              <button onClick={() => setShowShare(true)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><Share2 size={13} className="text-teal" /> Partilhar</button>
+              {(isOwn || isAdmin) && <div className="border-t border-border my-1" />}
+              {(isOwn || isAdmin) && <button onClick={() => { onEdit(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text hover:bg-bg4"><Edit3 size={13} className="text-amber" /> Editar</button>}
+              {(isOwn || isAdmin) && <button onClick={() => { onDelete(); setShowMenu(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red hover:bg-bg4"><Trash2 size={13} /> Eliminar</button>}
+            </div>
+          )}
+          {showShare && <ShareMenu track={track} onClose={() => { setShowShare(false); setShowMenu(false); }} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OSTPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { showToast } = useToast();
-  const [tracks, setTracks] = useState<MusicTrack[]>([]);
+  const { toggle, currentTrack, isPlaying, play, queue } = usePlayer();
+  const [tracks, setTracks] = useState<OSTTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('recent');
   const [showAdd, setShowAdd] = useState(false);
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.7);
-  const [isMuted, setIsMuted] = useState(false);
-  const [newTrack, setNewTrack] = useState({ title: '', artist: '', anime: '', youtube_url: '' });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [addMode, setAddMode] = useState<'url' | 'file'>('url');
+  const [editTrack, setEditTrack] = useState<OSTTrack | null>(null);
+  const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<OSTTrack | null>(null);
+  const [playlists, setPlaylists] = useState<Playlist[]>(getPlaylists());
+  const [showPlaylists, setShowPlaylists] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'playlists'>('all');
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  useEffect(() => {
-    loadTracks();
-  }, [user]);
+  const [form, setForm] = useState({ title: '', artist: '', anime: '', youtube_url: '', audio_url: '' });
 
-  // Handle audio events
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const isAdmin = !!(profile?.is_admin || ['supreme_admin', 'secondary_admin'].includes(profile?.role || ''));
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setPlayingId(null);
-    };
-
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, [playingId]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
-    }
-  }, [volume, isMuted]);
-
-  async function loadTracks() {
+  const loadTracks = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('ost_tracks')
-        .select('id, title, artist, anime, youtube_url, spotify_url, audio_url, added_by, likes_count, created_at, profiles(username)')
-        .order('created_at', { ascending: false });
+      let q = supabase.from('ost_tracks').select('id, title, artist, anime, youtube_url, audio_url, added_by, likes_count, created_at, profiles(username)');
+      if (sort === 'popular') q = q.order('likes_count', { ascending: false });
+      else q = q.order('created_at', { ascending: false });
 
-      if (!data) {
-        setTracks([]);
-        return;
-      }
+      const { data, error } = await q;
+      if (error) throw error;
 
       const likedIds = new Set<string>();
       if (user) {
-        const { data: likes } = await supabase
-          .from('ost_likes')
-          .select('ost_id')
-          .eq('user_id', user.id);
+        const { data: likes } = await supabase.from('ost_likes').select('ost_id').eq('user_id', user.id);
         (likes || []).forEach(l => likedIds.add(l.ost_id));
       }
-
-      setTracks(data.map(t => {
-        let profileData: { username: string } | undefined;
-        if (t.profiles) {
-          if (Array.isArray(t.profiles)) {
-            profileData = t.profiles[0];
-          } else {
-            profileData = t.profiles as { username: string };
-          }
-        }
-        return {
-          ...t,
-          profiles: profileData,
-          liked_by_me: likedIds.has(t.id)
-        };
-      }));
-    } catch (error) {
-      console.error('Error loading tracks:', error);
+      setTracks((data || []).map(t => ({ ...t, liked_by_me: likedIds.has(t.id) })) as OSTTrack[]);
+    } catch (err) {
+      handleError(err, showToast, { context: 'carregar mÃºsicas' });
     } finally {
       setLoading(false);
     }
+  }, [sort, user?.id]);
+
+  useEffect(() => { loadTracks(); }, [loadTracks]);
+
+  useEffect(() => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const ch = supabase.channel('ost_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ost_tracks' }, () => loadTracks())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'ost_tracks' }, payload => {
+        setTracks(prev => prev.filter(t => t.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ost_tracks' }, payload => {
+        setTracks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
+      })
+      .subscribe();
+    channelRef.current = ch;
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
+  }, [loadTracks]);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingFile(true);
+    try {
+      const prepared = await prepareMediaForUpload(file);
+      const path = `osts/${user.id}/${Date.now()}.${file.name.split('.').pop()}`;
+      const { error } = await supabase.storage.from('uploads').upload(path, prepared);
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
+      setForm(f => ({ ...f, audio_url: publicUrl }));
+      showToast('Ficheiro carregado! â', 'success');
+    } catch (err) {
+      handleError(err, showToast, { context: 'carregar ficheiro de Ã¡udio' });
+    } finally {
+      setUploadingFile(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   }
 
-  async function addTrack() {
-    if (!user) {
-      showToast('Entra para adicionar música', 'info');
-      return;
-    }
-    if (!newTrack.title.trim() || !newTrack.artist.trim()) {
-      showToast('Preenche título e artista', 'error');
-      return;
-    }
+  async function handleAdd() {
+    if (!user) return;
+    if (!form.title.trim() || !form.artist.trim()) { showToast('TÃ­tulo e artista sÃ£o obrigatÃ³rios', 'error'); return; }
+    if (!form.youtube_url.trim() && !form.audio_url.trim()) { showToast('Adiciona um URL do YouTube ou um ficheiro de Ã¡udio', 'error'); return; }
+    setAdding(true);
     try {
-      await supabase.from('ost_tracks').insert({
-        title: newTrack.title.trim(),
-        artist: newTrack.artist.trim(),
-        anime: newTrack.anime.trim() || null,
-        youtube_url: newTrack.youtube_url.trim() || null,
-        added_by: user.id
+      const { error } = await supabase.from('ost_tracks').insert({
+        title: form.title.trim(), artist: form.artist.trim(),
+        anime: form.anime.trim() || null,
+        youtube_url: form.youtube_url.trim() || null,
+        audio_url: form.audio_url.trim() || null,
+        added_by: user.id,
       });
-      showToast('Música adicionada!', 'success');
-      setNewTrack({ title: '', artist: '', anime: '', youtube_url: '' });
+      if (error) throw error;
+      showToast('MÃºsica adicionada! ðµ', 'success');
+      setForm({ title: '', artist: '', anime: '', youtube_url: '', audio_url: '' });
       setShowAdd(false);
       loadTracks();
-    } catch {
-      showToast('Erro ao adicionar', 'error');
+    } catch (err) {
+      handleError(err, showToast, { context: 'adicionar mÃºsica' });
+    } finally {
+      setAdding(false);
     }
   }
 
-  async function toggleLike(trackId: string, isLiked: boolean) {
-    if (!user) {
-      showToast('Entra para curtir', 'info');
-      return;
-    }
+  async function handleEdit() {
+    if (!editTrack) return;
     try {
-      if (isLiked) {
-        await supabase.from('ost_likes').delete().eq('ost_id', trackId).eq('user_id', user.id);
-        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, likes_count: t.likes_count - 1, liked_by_me: false } : t));
-      } else {
-        await supabase.from('ost_likes').insert({ ost_id: trackId, user_id: user.id });
-        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, likes_count: t.likes_count + 1, liked_by_me: true } : t));
-      }
+      const { error } = await supabase.from('ost_tracks').update({
+        title: form.title.trim(), artist: form.artist.trim(),
+        anime: form.anime.trim() || null, youtube_url: form.youtube_url.trim() || null,
+      }).eq('id', editTrack.id);
+      if (error) throw error;
+      showToast('MÃºsica actualizada! â', 'success');
+      setEditTrack(null);
+      loadTracks();
+    } catch (err) {
+      handleError(err, showToast, { context: 'editar mÃºsica' });
+    }
+  }
+
+  async function handleDelete(trackId: string) {
+    if (!confirm('Eliminar esta mÃºsica?')) return;
+    try {
+      const { error } = await supabase.from('ost_tracks').delete().eq('id', trackId);
+      if (error) throw error;
+      setTracks(prev => prev.filter(t => t.id !== trackId));
+      showToast('MÃºsica eliminada', 'info');
+    } catch (err) {
+      handleError(err, showToast, { context: 'eliminar mÃºsica' });
+    }
+  }
+
+  async function handleLike(track: OSTTrack) {
+    if (!user) { showToast('Entra para curtir', 'info'); return; }
+    const wasLiked = track.liked_by_me;
+    setTracks(prev => prev.map(t => t.id === track.id ? { ...t, liked_by_me: !wasLiked, likes_count: wasLiked ? Math.max(0, t.likes_count - 1) : t.likes_count + 1 } : t));
+    try {
+      if (wasLiked) await supabase.from('ost_likes').delete().eq('ost_id', track.id).eq('user_id', user.id);
+      else await supabase.from('ost_likes').insert({ ost_id: track.id, user_id: user.id });
     } catch {
-      showToast('Erro', 'error');
+      setTracks(prev => prev.map(t => t.id === track.id ? { ...t, liked_by_me: wasLiked, likes_count: wasLiked ? t.likes_count + 1 : Math.max(0, t.likes_count - 1) } : t));
     }
   }
 
-  async function deleteTrack(id: string) {
-    if (!user || !confirm('Tens certeza?')) return;
-    await supabase.from('ost_tracks').delete().eq('id', id).eq('added_by', user.id);
-    setTracks(prev => prev.filter(t => t.id !== id));
-    showToast('Removido', 'info');
+  function createPlaylist() {
+    if (!newPlaylistName.trim()) return;
+    const pl: Playlist = { id: Date.now().toString(), name: newPlaylistName.trim(), trackIds: [], createdAt: new Date().toISOString() };
+    const updated = [...playlists, pl];
+    setPlaylists(updated); savePlaylists(updated); setNewPlaylistName('');
+    showToast('Playlist criada! ð¶', 'success');
   }
 
-  function openYouTube(url: string | null) {
-    if (url) window.open(url, '_blank');
+  function addTrackToPlaylist(playlist: Playlist, trackId: string) {
+    if (playlist.trackIds.includes(trackId)) { showToast('JÃ¡ estÃ¡ na playlist', 'info'); return; }
+    const updated = playlists.map(p => p.id === playlist.id ? { ...p, trackIds: [...p.trackIds, trackId] } : p);
+    setPlaylists(updated); savePlaylists(updated);
+    showToast(`Adicionado a "${playlist.name}" â`, 'success');
+    setAddToPlaylistTrack(null);
   }
 
-  function playTrack(track: MusicTrack) {
-    // For now, just open YouTube as most tracks don't have direct audio URLs
-    if (track.youtube_url) {
-      // Extract video ID and use embedded player option
-      openYouTube(track.youtube_url);
-    }
+  function deletePlaylist(id: string) {
+    const updated = playlists.filter(p => p.id !== id);
+    setPlaylists(updated); savePlaylists(updated);
+    if (selectedPlaylist?.id === id) setSelectedPlaylist(null);
   }
 
-  function playPause() {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => {
-        showToast('Não foi possível reproduzir', 'error');
-      });
-    }
-    setIsPlaying(!isPlaying);
-  }
+  const filtered = tracks.filter(t =>
+    !search.trim() || t.title.toLowerCase().includes(search.toLowerCase()) ||
+    t.artist.toLowerCase().includes(search.toLowerCase()) || t.anime?.toLowerCase().includes(search.toLowerCase())
+  );
 
-  function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
+  const playlistTracks = selectedPlaylist
+    ? selectedPlaylist.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean) as OSTTrack[]
+    : [];
+
+  const displayTracks = activeTab === 'playlists' && selectedPlaylist ? playlistTracks : filtered;
 
   return (
-    <div className="min-h-screen pt-20 pb-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen pt-20 pb-28 px-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="font-bebas text-3xl md:text-4xl text-text mb-1">
-              Música & <span className="text-purple2">OST</span>
-            </h1>
-            <p className="text-text2 text-sm">Anime music recommendations e playlists.</p>
+            <h1 className="font-bebas text-4xl text-text tracking-wide">MÃºsicas <span className="text-purple2">&amp; OSTs</span></h1>
+            <p className="text-text3 text-xs mt-0.5">{tracks.length} faixas Â· toca sem sair da plataforma</p>
           </div>
           {user && (
-            <button onClick={() => setShowAdd(true)} className="btn btn-primary text-sm">
-              <Plus size={16} /> Adicionar
+            <button onClick={() => { setShowAdd(true); setForm({ title: '', artist: '', anime: '', youtube_url: '', audio_url: '' }); }} className="btn btn-primary text-sm gap-2">
+              <Plus size={15} /> Adicionar
             </button>
           )}
         </div>
 
-        {/* Mini Player (when playing) */}
-        {playingId && (
-          <div className="fixed bottom-20 left-0 right-0 bg-bg2 border-t border-border p-3 z-40 md:bottom-4 md:left-auto md:right-4 md:w-80 md:rounded-2xl md:border">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={playPause}
-                className="w-10 h-10 rounded-full bg-purple text-white flex items-center justify-center flex-shrink-0"
-              >
-                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text truncate">
-                  {tracks.find(t => t.id === playingId)?.title}
-                </div>
-                <div className="text-xs text-text3 truncate">
-                  {tracks.find(t => t.id === playingId)?.artist}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] text-text3">{formatTime(currentTime)}</span>
-                  <div className="flex-1 h-1 bg-bg rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-purple"
-                      style={{ width: `${(currentTime / duration) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-text3">{formatTime(duration)}</span>
-                </div>
+        {/* Tabs */}
+        <div className="flex gap-1 bg-bg2 border border-border rounded-xl p-1 mb-5">
+          <button onClick={() => setActiveTab('all')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'all' ? 'bg-purple text-white' : 'text-text3 hover:text-text'}`}>
+            Todas as MÃºsicas
+          </button>
+          <button onClick={() => setActiveTab('playlists')} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'playlists' ? 'bg-purple text-white' : 'text-text3 hover:text-text'}`}>
+            <span className="flex items-center justify-center gap-1.5"><ListMusic size={14} /> Playlists {playlists.length > 0 && <span className="text-[10px] bg-white/20 px-1 rounded">{playlists.length}</span>}</span>
+          </button>
+        </div>
+
+        {/* All tracks tab */}
+        {activeTab === 'all' && (
+          <>
+            <div className="flex gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text3" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por tÃ­tulo, artista ou anime..." className="input w-full pl-9 text-sm" />
               </div>
-              <button
-                onClick={() => {
-                  setIsPlaying(false);
-                  setPlayingId(null);
-                }}
-                className="text-text3 hover:text-text"
-              >
-                <X size={16} />
-              </button>
+              <select value={sort} onChange={e => setSort(e.target.value)} className="bg-bg2 border border-border rounded-xl px-3 text-sm text-text2 flex-shrink-0">
+                {SORT_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
             </div>
-          </div>
+
+            {loading ? (
+              <div className="bg-bg2 border border-border rounded-2xl p-4 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 animate-pulse">
+                    <div className="w-10 h-10 bg-bg3 rounded-xl flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5"><div className="h-3.5 bg-bg3 rounded w-1/3" /><div className="h-2.5 bg-bg3 rounded w-1/4" /></div>
+                    <div className="h-3 bg-bg3 rounded w-12" />
+                  </div>
+                ))}
+              </div>
+            ) : displayTracks.length === 0 ? (
+              <div className="text-center py-14 bg-bg2 border border-border rounded-2xl">
+                <Music size={40} className="mx-auto mb-3 text-text3" />
+                <h3 className="font-rajdhani font-bold text-lg text-text mb-1">Sem mÃºsicas</h3>
+                <p className="text-text3 text-sm">{search ? 'Tenta outra pesquisa.' : 'SÃª o primeiro a adicionar uma OST!'}</p>
+              </div>
+            ) : (
+              <div className="bg-bg2 border border-border rounded-2xl p-2 space-y-0.5">
+                {displayTracks.map(track => (
+                  <TrackCard key={track.id} track={track}
+                    currentTrackId={currentTrack?.id} isPlaying={isPlaying}
+                    onToggle={() => { if (track.audio_url) toggle(track); else if (track.youtube_url) window.open(track.youtube_url, '_blank'); }}
+                    onLike={() => handleLike(track)}
+                    onEdit={() => { setEditTrack(track); setForm({ title: track.title, artist: track.artist, anime: track.anime || '', youtube_url: track.youtube_url || '', audio_url: track.audio_url || '' }); }}
+                    onDelete={() => handleDelete(track.id)}
+                    onAddToPlaylist={() => setAddToPlaylistTrack(track)}
+                    isOwn={track.added_by === user?.id}
+                    isAdmin={isAdmin}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-12 h-12 border-2 border-border2 border-t-purple rounded-full animate-spin" />
-          </div>
-        ) : tracks.length === 0 ? (
-          <div className="text-center py-12 bg-bg2 border border-border rounded-2xl">
-            <Music size={48} className="mx-auto mb-4 text-text3" />
-            <h3 className="font-rajdhani font-bold text-xl text-text mb-2">Sem músicas</h3>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {tracks.map(track => (
-              <div
-                key={track.id}
-                className={`bg-bg2 border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-purple/30 transition-all ${
-                  playingId === track.id ? 'border-purple' : 'border-border'
-                }`}
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <button
-                    onClick={() => playTrack(track)}
-                    className="w-12 h-12 rounded-xl bg-bg3 flex items-center justify-center text-purple hover:bg-purple/20 transition-colors flex-shrink-0"
-                  >
-                    <Play size={20} />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-rajdhani font-bold text-text truncate">{track.title}</h3>
-                    <div className="text-sm text-text3 flex items-center gap-2 flex-wrap">
-                      <span>{track.artist}</span>
-                      {track.anime && (
-                        <>
-                          <span>·</span>
-                          <span className="text-purple2">{track.anime}</span>
-                        </>
-                      )}
-                    </div>
+        {/* Playlists tab */}
+        {activeTab === 'playlists' && (
+          <div>
+            {!selectedPlaylist ? (
+              <>
+                <div className="flex gap-2 mb-4">
+                  <input value={newPlaylistName} onChange={e => setNewPlaylistName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createPlaylist()} placeholder="Nome da nova playlist..." className="input flex-1 text-sm" maxLength={40} />
+                  <button onClick={createPlaylist} disabled={!newPlaylistName.trim()} className="btn btn-primary text-sm disabled:opacity-50"><Plus size={14} /></button>
+                </div>
+                {playlists.length === 0 ? (
+                  <div className="text-center py-14 bg-bg2 border border-border rounded-2xl">
+                    <ListMusic size={40} className="mx-auto mb-3 text-text3" />
+                    <h3 className="font-rajdhani font-bold text-lg text-text mb-1">Sem playlists ainda</h3>
+                    <p className="text-text3 text-sm">Cria a tua primeira playlist acima.</p>
                   </div>
+                ) : (
+                  <div className="space-y-2">
+                    {playlists.map(pl => (
+                      <div key={pl.id} className="flex items-center gap-3 bg-bg2 border border-border rounded-xl p-3 hover:border-border2 transition-colors">
+                        <button onClick={() => setSelectedPlaylist(pl)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple/30 to-teal/30 flex items-center justify-center flex-shrink-0"><ListMusic size={16} className="text-purple2" /></div>
+                          <div className="min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} mÃºsicas</div></div>
+                        </button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {pl.trackIds.length > 0 && (
+                            <button onClick={() => { const ts = pl.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean) as OSTTrack[]; if (ts[0]) play(ts[0], ts); }} className="w-8 h-8 rounded-lg bg-purple flex items-center justify-center text-white hover:bg-purple2">
+                              <Play size={13} className="ml-0.5" />
+                            </button>
+                          )}
+                          <button onClick={() => deletePlaylist(pl.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-text3 hover:text-red hover:bg-bg3"><Trash2 size={13} /></button>
+                          <ChevronRight size={16} className="text-text3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <button onClick={() => setSelectedPlaylist(null)} className="flex items-center gap-1.5 text-sm text-text3 hover:text-text mb-4">â Voltar</button>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-rajdhani font-bold text-xl text-text">{selectedPlaylist.name}</h2>
+                  {playlistTracks.length > 0 && <button onClick={() => play(playlistTracks[0], playlistTracks)} className="btn btn-primary text-xs py-2 px-3"><Play size={13} /> Tocar tudo</button>}
                 </div>
-
-                <div className="flex items-center gap-3 sm:gap-2">
-                  {/* Play on site button */}
-                  {track.youtube_url && (
-                    <button
-                      onClick={() => {
-                        setPlayingId(track.id);
-                        setIsPlaying(true);
-                        showToast('A abrir no YouTube...', 'info');
-                        setTimeout(() => openYouTube(track.youtube_url), 500);
-                      }}
-                      className="btn btn-ghost text-xs py-2 px-3 flex items-center gap-1"
-                    >
-                      <Music size={14} />
-                      Tocar
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => toggleLike(track.id, track.liked_by_me || false)}
-                    className={`flex items-center gap-1 text-sm ${track.liked_by_me ? 'text-red' : 'text-text3'}`}
-                  >
-                    <Heart size={16} fill={track.liked_by_me ? 'currentColor' : 'none'} />
-                    {track.likes_count}
-                  </button>
-
-                  {track.youtube_url && (
-                    <button onClick={() => openYouTube(track.youtube_url)} className="text-text3 hover:text-purple p-2">
-                      <ExternalLink size={16} />
-                    </button>
-                  )}
-
-                  {user?.id === track.added_by && (
-                    <button onClick={() => deleteTrack(track.id)} className="text-red hover:opacity-80 p-2">
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add Modal */}
-        {showAdd && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-bg2 border border-border rounded-2xl p-6 w-full max-w-md">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-rajdhani font-bold text-lg text-text">Adicionar Música</h2>
-                <button onClick={() => setShowAdd(false)}><X size={20} /></button>
-              </div>
-              <div className="space-y-4">
-                <div><label className="block text-xs text-text3 mb-1">Título</label>
-                  <input value={newTrack.title} onChange={e => setNewTrack({ ...newTrack, title: e.target.value })} className="input w-full" placeholder="Título da música" />
-                </div>
-                <div><label className="block text-xs text-text3 mb-1">Artista</label>
-                  <input value={newTrack.artist} onChange={e => setNewTrack({ ...newTrack, artist: e.target.value })} className="input w-full" placeholder="Nome do artista" />
-                </div>
-                <div><label className="block text-xs text-text3 mb-1">Anime</label>
-                  <input value={newTrack.anime} onChange={e => setNewTrack({ ...newTrack, anime: e.target.value })} className="input w-full" placeholder="Anime de origem" />
-                </div>
-                <div><label className="block text-xs text-text3 mb-1">YouTube URL</label>
-                  <input value={newTrack.youtube_url} onChange={e => setNewTrack({ ...newTrack, youtube_url: e.target.value })} className="input w-full" placeholder="https://youtube.com/watch?v=..." />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowAdd(false)} className="btn btn-ghost flex-1">Cancelar</button>
-                  <button onClick={addTrack} className="btn btn-primary flex-1">Adicionar</button>
-                </div>
-              </div>
-            </div>
+                {playlistTracks.length === 0 ? (
+                  <div className="text-center py-10 bg-bg2 border border-border rounded-2xl text-text3 text-sm">Playlist vazia. Adiciona mÃºsicas usando o menu â® de cada faixa.</div>
+                ) : (
+                  <div className="bg-bg2 border border-border rounded-2xl p-2 space-y-0.5">
+                    {playlistTracks.map(track => (
+                      <TrackCard key={track.id} track={track}
+                        currentTrackId={currentTrack?.id} isPlaying={isPlaying}
+                        onToggle={() => { if (track.audio_url) toggle(track); }}
+                        onLike={() => handleLike(track)}
+                        onEdit={() => {}}
+                        onDelete={() => {
+                          const updated = playlists.map(p => p.id === selectedPlaylist.id ? { ...p, trackIds: p.trackIds.filter(id => id !== track.id) } : p);
+                          setPlaylists(updated); savePlaylists(updated);
+                          setSelectedPlaylist(updated.find(p => p.id === selectedPlaylist.id) || null);
+                        }}
+                        onAddToPlaylist={() => setAddToPlaylistTrack(track)}
+                        isOwn={false} isAdmin={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
+
+      {/* Add Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setShowAdd(false)}>
+          <div className="bg-bg2 border border-border rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-rajdhani font-bold text-lg text-text">Adicionar MÃºsica</h2>
+              <button onClick={() => setShowAdd(false)}><X size={18} className="text-text3" /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                {(['url', 'file'] as const).map(m => (
+                  <button key={m} onClick={() => setAddMode(m)} className={`flex-1 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${addMode === m ? 'bg-purple/20 text-purple2 border border-purple/30' : 'bg-bg3 text-text3 border border-transparent'}`}>
+                    {m === 'url' ? <><Youtube size={14} /> URL YouTube</> : <><Upload size={14} /> Ficheiro de Ãudio</>}
+                  </button>
+                ))}
+              </div>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="TÃ­tulo *" className="input w-full text-sm" />
+              <input value={form.artist} onChange={e => setForm(f => ({ ...f, artist: e.target.value }))} placeholder="Artista *" className="input w-full text-sm" />
+              <input value={form.anime} onChange={e => setForm(f => ({ ...f, anime: e.target.value }))} placeholder="Anime (opcional)" className="input w-full text-sm" />
+              {addMode === 'url' ? (
+                <input value={form.youtube_url} onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))} placeholder="URL do YouTube" className="input w-full text-sm" />
+              ) : (
+                <div>
+                  <input ref={fileRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
+                  <button onClick={() => fileRef.current?.click()} disabled={uploadingFile} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-border hover:border-purple/50 text-sm text-text3 transition-colors disabled:opacity-50">
+                    {uploadingFile ? <><Loader2 size={15} className="animate-spin" /> A carregar...</> : form.audio_url ? 'â Ficheiro carregado' : <><Upload size={15} /> Seleccionar ficheiro de Ã¡udio</>}
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowAdd(false)} className="btn btn-ghost flex-1 text-sm">Cancelar</button>
+                <button onClick={handleAdd} disabled={adding} className="btn btn-primary flex-1 text-sm disabled:opacity-50">
+                  {adding ? 'Adicionando...' : 'ðµ Adicionar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editTrack && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setEditTrack(null)}>
+          <div className="bg-bg2 border border-border rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-rajdhani font-bold text-lg text-text">Editar MÃºsica</h2>
+              <button onClick={() => setEditTrack(null)}><X size={18} className="text-text3" /></button>
+            </div>
+            <div className="space-y-3">
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="TÃ­tulo" className="input w-full text-sm" />
+              <input value={form.artist} onChange={e => setForm(f => ({ ...f, artist: e.target.value }))} placeholder="Artista" className="input w-full text-sm" />
+              <input value={form.anime} onChange={e => setForm(f => ({ ...f, anime: e.target.value }))} placeholder="Anime" className="input w-full text-sm" />
+              <input value={form.youtube_url} onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))} placeholder="URL YouTube" className="input w-full text-sm" />
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setEditTrack(null)} className="btn btn-ghost flex-1 text-sm">Cancelar</button>
+                <button onClick={handleEdit} className="btn btn-primary flex-1 text-sm">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to playlist modal */}
+      {addToPlaylistTrack && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setAddToPlaylistTrack(null)}>
+          <div className="bg-bg2 border border-border rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-rajdhani font-bold text-base text-text">Adicionar Ã  Playlist</h2>
+              <button onClick={() => setAddToPlaylistTrack(null)}><X size={16} className="text-text3" /></button>
+            </div>
+            {playlists.length === 0 ? (
+              <p className="text-text3 text-sm text-center py-4">Cria uma playlist primeiro no separador Playlists.</p>
+            ) : (
+              <div className="space-y-2">
+                {playlists.map(pl => (
+                  <button key={pl.id} onClick={() => addTrackToPlaylist(pl, addToPlaylistTrack.id)} className="w-full flex items-center gap-3 bg-bg3 rounded-xl p-3 hover:bg-bg4 transition-colors text-left">
+                    <ListMusic size={15} className="text-purple2 flex-shrink-0" />
+                    <div className="flex-1 min-w-0"><div className="font-semibold text-text text-sm truncate">{pl.name}</div><div className="text-xs text-text3">{pl.trackIds.length} mÃºsicas</div></div>
+                    {pl.trackIds.includes(addToPlaylistTrack.id) && <span className="text-xs text-teal">â</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
