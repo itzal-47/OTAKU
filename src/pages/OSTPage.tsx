@@ -163,7 +163,11 @@ export default function OSTPage() {
         const { data: likes } = await supabase.from('ost_likes').select('ost_id').eq('user_id', user.id);
         (likes || []).forEach(l => likedIds.add(l.ost_id));
       }
-      setTracks((data || []).map(t => ({ ...t, liked_by_me: likedIds.has(t.id) })) as OSTTrack[]);
+      setTracks((data || []).map(t => ({
+        ...t,
+        profiles: Array.isArray(t.profiles) ? t.profiles[0] : t.profiles,
+        liked_by_me: likedIds.has(t.id)
+      })) as unknown as OSTTrack[]);
     } catch (err) {
       handleError(err, showToast, { context: 'carregar músicas' });
     } finally {

@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './components/AuthContext';
 import { ToastProvider } from './components/ToastContext';
+import { PlayerProvider } from './contexts/PlayerContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -52,65 +53,67 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<HomePage />} />
-              <Route path="login" element={<LoginPage />} />
-              <Route path="feed" element={<FeedPage />} />
-              <Route path="stories" element={<StoriesPage />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="dashboard" element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              } />
-              <Route path="settings" element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="arena" element={<ArenaPage />} />
-              <Route path="rankings" element={<RankingsPage />} />
-              <Route path="clas" element={<ClansPage />} />
-              <Route path="torneios" element={<TournamentsPage />} />
-              <Route path="torneios/:id" element={<TournamentsPage />} />
-              <Route path="eventos" element={<EventsPage />} />
-              <Route path="eventos/:id" element={<EventDetailPage />} />
-              <Route path="chat" element={<ChatPage />} />
-              <Route path="groups" element={<GroupsPage />} />
-              <Route path="groups/:id" element={<GroupDetailPage />} />
-              <Route path="messages" element={<MessagesPage />} />
-              <Route path="inbox" element={<AdminInboxPage />} />
-              <Route path="feedback" element={<FeedbackPage />} />
-              <Route path="quests" element={<QuestsPage />} />
-              <Route path="badges" element={<BadgesPage />} />
-              <Route path="quotes" element={<QuotesPage />} />
-              <Route path="watchlist" element={<WatchlistPage />} />
-              <Route path="fanart" element={<FanArtPage />} />
-              <Route path="ost" element={<OSTPage />} />
-              <Route path="wiki" element={<WikiPage />} />
-              <Route path="loja" element={<ShopPage />} />
-              <Route path="guia" element={<GuidePage />} />
-              <Route path="conquistas" element={<AchievementsPage />} />
-              <Route path="fundador" element={<FounderPage />} />
-              <Route path="bazar" element={<BazarPage />} />
-              <Route path="calendario-anime" element={<AnimeSchedulePage />} />
-              <Route path="match" element={<MatchPage />} />
-              <Route path="criar-personagem" element={
-                <ProtectedRoute>
-                  <CreateCharacterPage />
-                </ProtectedRoute>
-              } />
-              <Route path="privacidade" element={<PrivacyPage />} />
-              <Route path="sobre" element={<AboutPage />} />
-              <Route path="perfil/:username" element={<ProfilePage />} />
-              <Route path="admin" element={<AdminPage />} />
-              <Route path="termos" element={<TermsPage />} />
-              <Route path="ajuda" element={<HelpPage />} />
-              <Route path="funcionalidades" element={<FeaturesPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Route>
-          </Routes>
+          <PlayerProvider>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="feed" element={<FeedPage />} />
+                <Route path="stories" element={<StoriesPage />} />
+                <Route path="search" element={<SearchPage />} />
+                <Route path="dashboard" element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="settings" element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="arena" element={<ArenaPage />} />
+                <Route path="rankings" element={<RankingsPage />} />
+                <Route path="clas" element={<ClansPage />} />
+                <Route path="torneios" element={<TournamentsPage />} />
+                <Route path="torneios/:id" element={<TournamentsPage />} />
+                <Route path="eventos" element={<EventsPage />} />
+                <Route path="eventos/:id" element={<EventDetailPage />} />
+                <Route path="chat" element={<ChatPage />} />
+                <Route path="groups" element={<GroupsPage />} />
+                <Route path="groups/:id" element={<GroupDetailPage />} />
+                <Route path="messages" element={<MessagesPage />} />
+                <Route path="inbox" element={<AdminInboxPage />} />
+                <Route path="feedback" element={<FeedbackPage />} />
+                <Route path="quests" element={<QuestsPage />} />
+                <Route path="badges" element={<BadgesPage />} />
+                <Route path="quotes" element={<QuotesPage />} />
+                <Route path="watchlist" element={<WatchlistPage />} />
+                <Route path="fanart" element={<FanArtPage />} />
+                <Route path="ost" element={<OSTPage />} />
+                <Route path="wiki" element={<WikiPage />} />
+                <Route path="loja" element={<ShopPage />} />
+                <Route path="guia" element={<GuidePage />} />
+                <Route path="conquistas" element={<AchievementsPage />} />
+                <Route path="fundador" element={<FounderPage />} />
+                <Route path="bazar" element={<BazarPage />} />
+                <Route path="calendario-anime" element={<AnimeSchedulePage />} />
+                <Route path="match" element={<MatchPage />} />
+                <Route path="criar-personagem" element={
+                  <ProtectedRoute>
+                    <CreateCharacterPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="privacidade" element={<PrivacyPage />} />
+                <Route path="sobre" element={<AboutPage />} />
+                <Route path="perfil/:username" element={<ProfilePage />} />
+                <Route path="admin" element={<AdminPage />} />
+                <Route path="termos" element={<TermsPage />} />
+                <Route path="ajuda" element={<HelpPage />} />
+                <Route path="funcionalidades" element={<FeaturesPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </PlayerProvider>
         </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>

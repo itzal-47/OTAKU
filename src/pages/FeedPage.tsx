@@ -6,14 +6,13 @@ import { useToast } from '../components/ToastContext';
 import {
   Heart, MessageCircle, Share2, MoreHorizontal, Image as ImageIcon, Video,
   Send, X, Trash2, Edit3, Loader2, Clock, Maximize2, Globe, Users,
-  CheckCircle2, ArrowUp, Sparkles, Play
+  CheckCircle2, ArrowUp, Sparkles, Play, Pause, Music, ChevronRight
 } from 'lucide-react';
 import { CLASS_INFO, type CharacterClass } from '../types/index';
 import StoriesBar from '../components/StoriesBar';
 import GuestCTA from '../components/GuestCTA';
 import { prepareMediaForUpload } from '../lib/imageCompress';
 import { usePlayer } from '../contexts/PlayerContext';
-import { Music, Play, Pause, ChevronRight } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
