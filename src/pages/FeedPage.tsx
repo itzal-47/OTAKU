@@ -12,6 +12,8 @@ import { CLASS_INFO, type CharacterClass } from '../types/index';
 import StoriesBar from '../components/StoriesBar';
 import GuestCTA from '../components/GuestCTA';
 import { prepareMediaForUpload } from '../lib/imageCompress';
+import { usePlayer } from '../contexts/PlayerContext';
+import { Music, Play, Pause, ChevronRight } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -728,6 +730,53 @@ function PostComposer({ currentUser, currentProfile, onPosted, showToast }: {
   );
 }
 
+// ─── OST Strip ───────────────────────────────────────────────────────────────
+
+function OSTStrip() {
+  const [tracks, setTracks] = useState<any[]>([]);
+  const { toggle, currentTrack, isPlaying } = usePlayer();
+
+  useEffect(() => {
+    supabase.from('ost_tracks').select('id, title, artist, anime, audio_url, youtube_url, likes_count')
+      .order('likes_count', { ascending: false }).limit(8)
+      .then(({ data }) => setTracks(data || []));
+  }, []);
+
+  if (tracks.length === 0) return null;
+
+  return (
+    <div className="bg-bg2 border border-border rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Music size={15} className="text-purple2" />
+          <span className="font-rajdhani font-bold text-text text-sm">OSTs do Momento</span>
+        </div>
+        <a href="/osts" className="text-xs text-purple2 hover:underline flex items-center gap-1">Ver mais <ChevronRight size={12} /></a>
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin -mx-1 px-1 no-scrollbar">
+        {tracks.map((t, i) => {
+          const isActive = currentTrack?.id === t.id;
+          return (
+            <button key={t.id} onClick={() => { if (t.audio_url) toggle(t); else if (t.youtube_url) window.open(t.youtube_url, '_blank'); }}
+              className={`flex-shrink-0 w-36 text-left rounded-xl p-3 border transition-all ${isActive ? 'bg-purple/15 border-purple/40' : 'bg-bg3 border-transparent hover:border-border2'}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${isActive ? 'bg-purple text-white' : 'bg-bg2 text-text3'}`}>
+                {isActive && isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+              </div>
+              <p className={`text-xs font-semibold truncate ${isActive ? 'text-purple2' : 'text-text'}`}>{t.title}</p>
+              <p className="text-[10px] text-text3 truncate">{t.artist}</p>
+              {t.anime && <p className="text-[10px] text-text3/70 truncate">{t.anime}</p>}
+            </button>
+          );
+        })}
+        <a href="/osts" className="flex-shrink-0 w-20 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border hover:border-purple/40 transition-colors text-text3 hover:text-purple2">
+          <ChevronRight size={16} />
+          <span className="text-[10px] text-center">Ver mais</span>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FeedPage() {
@@ -876,6 +925,9 @@ export default function FeedPage() {
 
         {/* Stories */}
         <StoriesBar />
+
+        {/* OST Strip */}
+        <OSTStrip />
 
         {/* Composer */}
         {user && (
